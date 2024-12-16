@@ -30,6 +30,8 @@
 
 ## Team Formation Overview
 
+### Team Composition
+
 Our team is composed of three passionate developers, each bringing complementary skills:
 
 - **Fassih**: Lead Developer & Project Manager
@@ -47,12 +49,25 @@ Our team is composed of three passionate developers, each bringing complementary
   - Skills in code review and documentation
   - Passionate about best development practices
 
-**Collaboration Strategy:**
+### Collaboration Strategy
+
 - Communication via Discord for daily exchanges
 - GitHub for versioning and code review
 - Weekly meetings for synchronization
 
 ## Ideas Explored
+
+### List of Considered Ideas
+
+1. Astronomical Image Collection Manager
+2. Observatory Webcam Streaming Platform
+3. Amateur Exoplanet Detection System
+4. Augmented Reality Sky Observation App
+5. Sky Panoramic Image Stitching Tool
+6. Crowdsourcing Platform for Galaxy Classification
+7. StellarStudio: Astronomical Image Processing
+
+### Reasons for Rejections
 
 1. **Astronomical Image Collection Manager**
     - *Rejected*: Lack of advanced processing features
@@ -72,10 +87,14 @@ Our team is composed of three passionate developers, each bringing complementary
 6. **Crowdsourcing Platform for Galaxy Classification**
     - *Rejected*: Requires a large user base from the start
 
+### Selected Solution
+
 7. **StellarStudio: Astronomical Image Processing**
     - *Selected*: Perfect alignment with our skills and passions
 
 ## Selected MVP Concept
+
+### Inspiration (AstroBin & PixInsight)
 
 StellarStudio aims to combine the strengths of two major astrophotography tools:
 
@@ -85,8 +104,14 @@ StellarStudio aims to combine the strengths of two major astrophotography tools:
 
 This approach combines the social aspects of AstroBin with the processing power of PixInsight, all accessible from any web browser: ACCESSIBLE AT AUNT CLAUDE'S OR GRANDMA JEANINE'S ("Grand-maman NINE-JA", for close friends (in verlan :D).)
 
-### Summary
-StellarStudio is an innovative web application that democratizes astronomical image processing:
+### Target Audience
+
+StellarStudio caters to three main user groups:
+1. Beginners
+2. Intermediates
+3. Advanced Users
+
+### Features by Expertise Level
 
 **For Beginners:**
 - Access to images from major telescopes via the MAST/Astroquery portal
@@ -134,6 +159,8 @@ StellarStudio is an innovative web application that democratizes astronomical im
 - Voting system on processed images
 - Sharing and evaluation of processing workflows
 - Recognition badges for demonstrated expertise
+
+## Project Analysis
 
 ### Reasons for Selection
 
@@ -293,20 +320,22 @@ StellarStudio is an innovative web application that democratizes astronomical im
 
 StellarStudio represents an ambitious project that meets several objectives. While ambitious in scope, this MVP strikes a balance between innovation and feasibility, leveraging modern technologies to democratize astronomical image processing.
 
-1. **Technical Challenge**
-    - Use of modern technologies
-    - Scalable and evolving architecture
-    - Complex scientific image processing
+### Technical Challenge
+- Use of modern technologies
+- Scalable and evolving architecture
+- Complex scientific image processing
 
-2. **Community Impact**
-    - Democratization of amateur astronomy
-    - Contribution to citizen science
-    - Creation of a supportive community
+### Community Impact
+- Democratization of amateur astronomy
+- Contribution to citizen science
+- Creation of a supportive community
 
-3. **Personal Development**
-    - Skill development on key technologies
-    - Learning scientific image processing
-    - Management of a complex project
+### Personal Development
+- Skill development on key technologies
+- Learning scientific image processing
+- Management of a complex project
+
+### Future Evolutions
 
 This MVP, although technically demanding, remains achievable with the available resources. The project can evolve based on:
 - User feedback
