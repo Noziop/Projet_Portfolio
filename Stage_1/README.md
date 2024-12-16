@@ -39,21 +39,21 @@ Our team is composed of three passionate developers, each bringing complementary
   - Experience in agile project management
   - Passionate about automation and best practices
 
-- **Suzie**: Full-Stack Developer & UX Designer
+- **Fassih2**: Full-Stack Developer & UX Designer
   - Expertise in frontend and backend development
   - Skills in user interface design
   - Passionate about astronomy and photography
 
-- **Zoé**: Technical Lead & Quality Assurance
+- **Fassih3**: Technical Lead & Quality Assurance
   - Expertise in Python and automated testing
   - Skills in code review and documentation
   - Passionate about best development practices
 
 ### Collaboration Strategy
 
-- Communication via Discord for daily exchanges
+- Communication via telepathy for daily exchanges
 - GitHub for versioning and code review
-- Weekly meetings for synchronization
+- daily IRL meetings for watch synchronization (Parker Lewis Ne Perd Jamais #i_feel_old)
 
 ## Ideas Explored
 
