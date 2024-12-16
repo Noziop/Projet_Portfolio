@@ -121,6 +121,7 @@ StellarStudio caters to three main user groups:
   - Detail enhancement
 
 **For Intermediates:**
+**Begginers Features + :**
 - Advanced processing tools:
   - Dynamic Background Extraction
   - Stacking
@@ -129,6 +130,7 @@ StellarStudio caters to three main user groups:
 - Contribution to citizen science projects
 
 **For Advanced Users:**
+**Intermediates Features + :**
 - Customizable workflows
 - Professional processing tools
 - Ability to monetize their workflows
