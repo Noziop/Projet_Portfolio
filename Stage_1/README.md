@@ -138,7 +138,7 @@ StellarStudio caters to three main user groups:
 
 ### Technical Innovation
 
-![Architecture](docs/achitecture.mmd)
+![architecture](docs/architecture.mmd)
 
 **Distributed processing via containers**
 - Multi-container Docker architecture:
