@@ -138,6 +138,8 @@ StellarStudio caters to three main user groups:
 
 ### Technical Innovation
 
+![Architecture](docs/achitecture.mmd)
+
 **Distributed processing via containers**
 - Multi-container Docker architecture:
   - FastAPI backend for the REST API
