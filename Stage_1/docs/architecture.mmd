@@ -12,15 +12,23 @@ graph TD
     
     D --> C1[Celery Worker 1]
     D --> C2[Celery Worker 2]
+    D --> C3[Celery Worker 3]
+    D --> C4[Celery Worker 4]
     
     C1 --> B1
     C1 --> B2
     C2 --> B1
     C2 --> B2
+    C3 --> B1
+    C3 --> B2
+    C4 --> B1
+    C4 --> B2
     
     subgraph "Processing Layer"
         C1
         C2
+        C3
+        C4
     end
     
     subgraph "Data Layer"
