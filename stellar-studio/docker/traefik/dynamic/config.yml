@@ -1,0 +1,25 @@
+# docker/traefik/dynamic/config.yml
+http:
+  routers:
+    backend:
+      rule: "Host(`api.localhost`)"
+      service: backend
+      entryPoints:
+        - web
+    
+    frontend:
+      rule: "Host(`localhost`)"
+      service: frontend
+      entryPoints:
+        - web
+
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:8000"
+    
+    frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:8080"

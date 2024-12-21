@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "stellarstudio"
+version = "0.1.0"
+description = ""
+authors = ["Noziop <contact@fassih.ch>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+pydantic = "*"
+sqlalchemy = "*"
+astroquery = "*"
+astropy = "*"
+numpy = "*"
+scikit-learn = "*"
+celery = "*"
+redis = "*"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
