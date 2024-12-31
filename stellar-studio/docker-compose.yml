@@ -36,6 +36,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=stellarpassword
     labels:
@@ -54,11 +55,13 @@ services:
     volumes:
       - ./backend:/app
       - ./downloads:/app/downloads
+    user: "1000:1000"
     environment:
       - DATABASE_URL=mysql://stellaruser:stellarpassword@database:3306/stellarstudio
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_URL=http://minio:9000
     depends_on:
       redis:
         condition: service_healthy
@@ -90,6 +93,22 @@ services:
       replicas: 4
       restart_policy:
         condition: on-failure
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.rule=Host(`minio.localhost`)"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
 
   frontend:
     build: ./frontend
@@ -132,3 +151,5 @@ services:
 volumes:
   grafana-data:
   prometheus-data:
+  minio-data:
+  downloads:

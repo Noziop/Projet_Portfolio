@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.core.monitoring import setup_monitoring
+from app.services.minio_service import init_minio
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,3 +28,5 @@ async def startup_event():
     # Debug : afficher toutes les routes
     routes = [{"path": route.path, "name": route.name} for route in app.routes]
     print("Routes disponibles:", routes)
+    init_minio()
+

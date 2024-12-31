@@ -16,7 +16,15 @@ celery = "^5.3.6"
 redis = "^5.0.1"
 sqlalchemy = "^2.0.23"
 mysqlclient = "^2.2.0"
-pydantic = "^2.7.0"
+pydantic = {extras = ["email"], version = "^2.10.4"}
 pydantic-settings = "^2.0.0"
 astropy = "^5.3.2"
 prometheus-fastapi-instrumentator = "^6.1.0"
+alembic = "^1.14.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.20"
+minio = "^7.1.14"
+scikit-image = "^0.21.0"
+scipy = "^1.11.0"
+

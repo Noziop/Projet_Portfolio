@@ -2,6 +2,9 @@ from app.core.celery import celery_app
 from astroquery.mast import Observations
 from astroquery.simbad import Simbad
 import logging
+from app.services.minio_service import get_minio_client
+import os
+from tempfile import NamedTemporaryFile
 
 # Dictionnaire des cibles disponibles
 targets = {
@@ -75,27 +78,46 @@ def get_target_preview(object_name: str, telescope: str):
     """Récupère l'URL de preview pour un objet et un télescope donnés"""
     try:
         obs_table = Observations.query_object(object_name, radius=0.2)
+        if len(obs_table) == 0:
+            logging.warning(f"No observations found for {object_name}")
+            return None
+            
         obs_filtered = obs_table[obs_table['obs_collection'] == telescope]
-        products = Observations.get_product_list(obs_filtered)
+        if len(obs_filtered) == 0:
+            logging.warning(f"No {telescope} observations found for {object_name}")
+            return None
+            
+        products = Observations.get_product_list(obs_filtered[0:1])  # Limite à la première observation
         preview_products = Observations.filter_products(
             products,
             productType=["PREVIEW"],
             extension="jpg"
         )
+        
         if len(preview_products) > 0:
-            return preview_products[0]['dataURL']
+            preview_url = preview_products[0].get('dataURL')
+            if not preview_url:
+                logging.warning(f"No preview URL for {object_name}")
+                return None
+            return preview_url
+            
         return None
     except Exception as e:
-        logging.error(f"Erreur preview: {str(e)}")
+        logging.error(f"Erreur preview pour {object_name}: {str(e)}")
         return None
 
 def get_available_targets(telescope: str):
     """Retourne la liste des cibles avec leurs previews pour un télescope"""
     telescope_targets = targets.get(telescope, [])
+    result = []
+    
     for target in telescope_targets:
-        preview_url = get_target_preview(target['id'], telescope)
-        target['preview_url'] = preview_url
-    return telescope_targets
+        target_copy = target.copy()  # Évite de modifier le dictionnaire original
+        preview_url = get_target_preview(target_copy['id'], telescope)
+        target_copy['preview_url'] = preview_url
+        result.append(target_copy)
+        
+    return result
 
 @celery_app.task(name='app.services.telescope_service.fetch_object_data')
 def fetch_object_data(object_name: str):
@@ -112,33 +134,66 @@ def fetch_object_data(object_name: str):
 
 @celery_app.task(name='app.services.telescope_service.download_fits_async')
 def download_fits_async(object_name: str, telescope: str):
-    """Télécharge les fichiers FITS pour un objet et un télescope donnés"""
+    """Télécharge les fichiers FITS et les stocke dans MinIO"""
     try:
-        obs_table = Observations.query_object(object_name)
-        products = Observations.get_product_list(obs_table)
+        # Initialiser le client MinIO
+        minio_client = get_minio_client()
+        bucket_name = "fits-files"
+
+        # S'assurer que le bucket existe
+        if not minio_client.bucket_exists(bucket_name):
+            minio_client.make_bucket(bucket_name)
+
+        # 1. Recherche des observations
+        obs_table = Observations.query_object(object_name, radius=".02 deg")
+        
+        # 2. Filtrage par télescope
+        obs_filtered = obs_table[obs_table['obs_collection'] == telescope]
+        if len(obs_filtered) == 0:
+            return {
+                "status": "error",
+                "message": f"No {telescope} observations found for {object_name}"
+            }
+
+        # 3. Obtention des produits
+        products = Observations.get_product_list(obs_filtered[0])
+
+        # 4. Filtrage des produits FITS
         filtered_products = Observations.filter_products(
             products,
             productType=["SCIENCE"],
-            obs_collection=[telescope],
             extension="fits"
         )
-        
+
         if not filtered_products:
             return {
                 "status": "error",
                 "message": f"No FITS files found for {object_name} with {telescope}"
             }
 
-        downloaded_files = Observations.download_products(
-            filtered_products,
-            download_dir="/app/downloads"
-        )
+        uploaded_files = []
+        
+        # 5. Téléchargement et upload vers MinIO
+        for product in filtered_products:
+            # Télécharger le fichier
+            result = Observations.download_file(product['dataURI'])
+            if result[0] == 'COMPLETE':
+                # Le nom du fichier est basé sur l'URI
+                filename = product['dataURI'].split('/')[-1]
+                if os.path.exists(filename):
+                    # Upload vers MinIO
+                    minio_path = f"{telescope}/{object_name}/{filename}"
+                    minio_client.fput_object(bucket_name, minio_path, filename)
+                    uploaded_files.append(minio_path)
+                    # Nettoyer le fichier local
+                    os.remove(filename)
 
         return {
             "status": "success",
-            "count": len(downloaded_files),
-            "files": [str(f) for f in downloaded_files]
+            "count": len(uploaded_files),
+            "files": uploaded_files
         }
+
     except Exception as e:
-        logging.error(f"Erreur MAST: {str(e)}")
+        logging.error(f"Erreur MAST/MinIO: {str(e)}")
         return {"status": "error", "message": str(e)}
