@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Installation des dépendances système
 RUN apt-get update && apt-get install -y \
     pkg-config \
     default-libmysqlclient-dev \
@@ -11,30 +11,31 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install poetry and watchdog
-RUN pip install poetry watchdog
+# Installation de Poetry
+RUN pip install poetry
 
-# Copy dependency files and entrypoint script
+# Désactivation de la création d'environnement virtuel
+RUN poetry config virtualenvs.create false
+
+# Copie des fichiers de dépendances
 COPY pyproject.toml poetry.lock ./
+
+# Installation des dépendances
+RUN poetry install --no-interaction --no-root
+
+# Copie du script d'entrée et configuration des permissions
 COPY celery-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/celery-entrypoint.sh
 
-# Installer les dépendances en tant que root
-RUN poetry config virtualenvs.create false && \
-    poetry lock --no-update && \
-    poetry install --no-interaction --no-ansi
-
-# Copier l'application
+# Copie de l'application
 COPY . .
 
-# Créer l'utilisateur non-root et configurer les permissions
+# Création de l'utilisateur et configuration des permissions
 RUN adduser --disabled-password --gecos '' celery_user && \
     chown -R celery_user:celery_user /app
 
-# Configurer PYTHONPATH
 ENV PYTHONPATH=/app
 
-# Switcher vers l'utilisateur non-root
 USER celery_user
 
 ENTRYPOINT ["celery-entrypoint.sh"]

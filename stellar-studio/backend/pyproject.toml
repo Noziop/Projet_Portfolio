@@ -1,10 +1,13 @@
-# backend/pyproject.toml
-[tool.poetry]
-package-mode = false
+[project]
 name = "stellar-studio"
 version = "0.1.0"
 description = "Astrophotography Processing Platform"
-authors = ["Noziop <contact@fassih.ch>"]
+authors = [
+    {name = "Noziop", email = "contact@fassih.ch"}
+]
+
+[tool.poetry]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -28,3 +31,6 @@ minio = "^7.1.14"
 scikit-image = "^0.21.0"
 scipy = "^1.11.0"
 
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

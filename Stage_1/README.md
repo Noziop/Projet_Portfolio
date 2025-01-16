@@ -4,6 +4,7 @@
 
 1. [Team Formation Overview](#team-formation-overview)
     - [Team Composition](#team-composition)
+    - [External Stakeholders](#external-stakeholders)
     - [Collaboration Strategy](#collaboration-strategy)
 
 2. [Ideas Explored](#ideas-explored)
@@ -13,9 +14,11 @@
 
 3. [Selected MVP Concept](#selected-mvp-concept)
     - [Inspiration (AstroBin & PixInsight)](#inspiration-astrobin--pixinsight)
+    - [Smart Objectives](#smart-objectives)
     - [Target Audience](#target-audience)
     - [Features by Expertise Level](#features-by-expertise-level)
     - [Technical Innovation](#technical-innovation)
+    - [Project Scope](#project-scope)
 
 4. [Project Analysis](#project-analysis)
     - [Reasons for Selection](#reasons-for-selection)
@@ -49,11 +52,26 @@ Our team is composed of three passionate developers, each bringing complementary
   - Skills in code review and documentation
   - Passionate about best development practices
 
+### External Stakeholders
+
+- **Holberton School**
+  - Project evaluators (hoping they appreciate our sense of humor)
+  - Technical mentors (when we're really stuck)
+  - My very dears and beloved fellow holbie students (for moral support and debugging sessions)
+
+- **Astronomical Community**
+  - MAST Portal (our celestial data provider)
+  - Astrometry.net (helping us not get lost in space)
+  - Amateur astronomers (our future power users)
+  - Aunt Claude and Grandma Jeanine (our most enthusiastic beta testers)
+
 ### Collaboration Strategy
 
 - Communication via telepathy for daily exchanges
 - GitHub for versioning and code review
-- daily IRL meetings for watch synchronization (Parker Lewis Ne Perd Jamais #i_feel_old)
+- Daily IRL meetings for watch synchronization (Parker Lewis Ne Perd Jamais #i_feel_old)
+- Regular updates to external stakeholders (when Mercury is not retrograde)
+
 
 ## Ideas Explored
 
@@ -103,6 +121,31 @@ StellarStudio aims to combine the strengths of two major astrophotography tools:
 - **PixInsight**: An advanced astronomical image processing software, offering powerful tools like calibration, automatic alignment, and multi-scale processing. It is known for its scientific rigor and precision.
 
 This approach combines the social aspects of AstroBin with the processing power of PixInsight, all accessible from any web browser: ACCESSIBLE AT AUNT CLAUDE'S OR GRANDMA JEANINE'S ("Grand-maman NINE-JA", for close friends (in verlan :D).)
+
+### SMART Objectives
+
+**By March 13, 2024 (MVP Presentation):**
+
+1. **Image Processing Pipeline**
+   - Implement a functional MAST/MinIO pipeline capable of downloading and processing HST FITS files
+   - Success metric: Process at least 3 different types of astronomical objects (nebulae, galaxies, star clusters)
+   - Target performance: Complete processing within 5 minutes per image
+
+2. **User Interface Development**
+   - Create an intuitive web interface for beginners to process astronomical images
+   - Success metric: Enable users to complete basic image processing in less than 10 clicks
+   - Include at least 3 pre-configured processing workflows
+
+3. **Technical Infrastructure**
+   - Deploy a scalable architecture handling multiple simultaneous processing requests
+   - Success metric: Successfully process 5 concurrent image requests
+   - Maintain system stability with 95% uptime during processing operations
+
+4. **Documentation and Testing**
+   - Achieve 80% test coverage for critical processing functions
+   - Provide comprehensive API documentation via FastAPI's automatic documentation
+   - Include beginner-friendly tutorials for each pre-configured workflow
+
 
 ### Target Audience
 
@@ -194,6 +237,62 @@ graph TD
 - Voting system on processed images
 - Sharing and evaluation of processing workflows
 - Recognition badges for demonstrated expertise
+
+### Project Scope
+
+**In Scope (MVP for March 13, 2024)**
+- Image Sources and Formats
+  - MAST Integration (HST/JWST FITS files)
+  - Support for DSLR RAW formats (Canon, Nikon, Sony)
+  - Basic mosaic assembly for multi-panel images
+  - HDR processing for high dynamic range objects
+
+- Image Processing
+  - Basic calibration and stacking
+  - Automated workflows for beginners
+  - Manual parameter adjustment for advanced users
+  - Integration with astrometry.net for plate solving
+
+- User Interface
+  - Web-based processing interface
+  - Basic user authentication
+  - Progress tracking for processing tasks
+  - Result visualization and download
+
+**Out of Scope**
+- Real-time telescope control and image acquisition
+- Advanced social features (messaging, forums)
+- Mobile application development
+- Direct integration with commercial telescopes
+- Offline processing capabilities
+- Advanced user management (roles, permissions)
+- Subscription system implementation
+
+**Future Considerations** *(Post-MVP)*
+- Integration with additional data sources (ESO, ALMA)
+- Advanced workflow sharing system
+- Community features and social interactions
+- Mobile-responsive interface
+- Premium feature implementation
+
+### timeline
+
+```mermaid
+timeline
+    title StellarStudio Project Timeline
+    section Phase 1
+        Integration MAST/MinIO : 2024-01-12 - 2024-01-26
+    section Phase 2
+        Development of basic workflows : 2024-01-27 - 2024-02-09
+    section Phase 3
+        Frontend interface implementation : 2024-02-10 - 2024-02-24
+    section Phase 4
+        Testing and optimization : 2024-02-25 - 2024-03-08
+    section Phase 5
+        Final preparation : 2024-03-09 - 2024-03-12
+        MVP Presentation : 2024-03-13
+```
+
 
 ## Project Analysis
 
@@ -379,3 +478,4 @@ This MVP, although technically demanding, remains achievable with the available 
 - Discovered technical constraints
 
 The specifications and technical choices presented in this document are subject to change to adapt to the project's needs and real-world conditions.
+

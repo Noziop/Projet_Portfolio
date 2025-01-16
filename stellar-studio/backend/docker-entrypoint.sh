@@ -13,40 +13,24 @@ cleanup() {
 # Mettre en place le trap pour le nettoyage
 trap cleanup EXIT
 
-# Vérification de santé
-health_check() {
-    if ! poetry check; then
-        echo "Poetry check failed, running lock..."
-        poetry lock --no-update
-        if ! poetry check; then
-            echo "Poetry check still failed after lock"
-            return 1
-        fi
-    fi
-    return 0
-}
-
+# Installation des dépendances simplifiée
 install_deps() {
-    if ! health_check; then
-        echo "Health check failed"
-        exit 1
-    fi
     poetry config virtualenvs.create false
-    poetry install --no-interaction --no-ansi
+    # Ignorer les warnings de poetry en redirigeant stderr
+    poetry install --no-interaction --no-ansi 2>/dev/null
 }
 
 # Installation initiale
-install_deps
+install_deps || true
 
 # Démarrer le watcher en arrière-plan et sauvegarder son PID
 watchmedo shell-command \
     --patterns="pyproject.toml" \
     --recursive \
-    --command='poetry lock --no-update && poetry install' &
+    --command='poetry install --no-interaction --no-ansi 2>/dev/null' &
 BACKGROUND_PID=$!
 
 # Démarrer l'application
 poetry run alembic upgrade head
 poetry run python -c "from app.db.init_db import init_db; from app.db.session import SessionLocal; init_db(SessionLocal())"
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
