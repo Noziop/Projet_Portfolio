@@ -278,19 +278,20 @@ graph TD
 ### timeline
 
 ```mermaid
-timeline
+gantt
+    dateFormat  YYYY-MM-DD
     title StellarStudio Project Timeline
-    section Phase 1
-        Integration MAST/MinIO : 2024-01-12 - 2024-01-26
-    section Phase 2
-        Development of basic workflows : 2024-01-27 - 2024-02-09
-    section Phase 3
-        Frontend interface implementation : 2024-02-10 - 2024-02-24
-    section Phase 4
-        Testing and optimization : 2024-02-25 - 2024-03-08
-    section Phase 5
-        Final preparation : 2024-03-09 - 2024-03-12
-        MVP Presentation : 2024-03-13
+    section Integration MAST/MinIO
+    Integration MAST/MinIO           :active, 2024-01-12, 2024-01-26
+    section Development of basic workflows
+    Development of basic workflows   :2024-01-27, 2024-02-09
+    section Frontend interface implementation
+    Frontend interface implementation:2024-02-10, 2024-02-24
+    section Testing and optimization
+    Testing and optimization         :2024-02-25, 2024-03-08
+    section MVP Presentation
+    Final preparation               :2024-03-09, 2024-03-12
+    MVP Presentation               :milestone, 2024-03-13, 2024-03-13
 ```
 
 
@@ -302,7 +303,7 @@ timeline
     - Mastered and modern technology stack:
       * Backend: Python 3.10+, FastAPI for optimal performance
       * Frontend: Vue.js 3 with Composition API
-      * Database: MariaDB for reliability
+      * Database: MariaDB for reliability + MiniO for FITS files stocking
       * Cache and message broker: Redis
     - Specialized libraries:
       * Scikit-learn for ML and image processing
@@ -316,6 +317,7 @@ timeline
       * Docker Compose for containerization
       * Traefik for simple load balancing
       * Celery for asynchronous processing
+      * Prometheus and Grafana for Server side Monitoring
 
 2. **Innovation**
     - Democratization of astronomical image processing:
