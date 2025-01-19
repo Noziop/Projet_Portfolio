@@ -109,6 +109,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.minio.rule=Host(`minio.localhost`)"
       - "traefik.http.services.minio.loadbalancer.server.port=9000"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build: ./frontend
@@ -117,8 +122,8 @@ services:
       - "traefik.http.routers.frontend.rule=Host(`localhost`)"
       - "traefik.http.services.frontend.loadbalancer.server.port=8080"
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./frontend:/app:delegated
+      - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
 
@@ -153,3 +158,4 @@ volumes:
   prometheus-data:
   minio-data:
   downloads:
+  frontend_node_modules:

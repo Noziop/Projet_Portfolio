@@ -5,6 +5,10 @@ description = "Astrophotography Processing Platform"
 authors = [
     {name = "Noziop", email = "contact@fassih.ch"}
 ]
+requires-python = "^3.9"
+
+[project.dynamic]
+dependencies = true
 
 [tool.poetry]
 package-mode = false
@@ -22,7 +26,7 @@ mysqlclient = "^2.2.0"
 pydantic = {extras = ["email"], version = "^2.10.4"}
 pydantic-settings = "^2.0.0"
 astropy = "^5.3.2"
-prometheus-fastapi-instrumentator = "^6.1.0"
+prometheus-fastapi-instrumentator = "*"
 alembic = "^1.14.0"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}

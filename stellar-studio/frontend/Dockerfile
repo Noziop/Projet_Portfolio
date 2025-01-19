@@ -3,9 +3,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install dependencies
-COPY package.json ./
-RUN npm install
-RUN npm install @vitejs/plugin-vue --save-dev
+COPY package*.json ./
+RUN npm install  # Au lieu de npm ci
 
 # Ajouter un utilisateur non-root et donner les permissions
 RUN adduser -D nodeuser && \
@@ -13,12 +12,9 @@ RUN adduser -D nodeuser && \
     chown -R nodeuser:nodeuser /app && \
     chmod -R 755 node_modules
 
-# Switcher vers l'utilisateur non-root
 USER nodeuser
 
-# Copy application code
-COPY . .
+COPY --chown=nodeuser:nodeuser . .
 
-# Corriger le script de démarrage (il y avait un doublon dans les options)
 EXPOSE 8080
 CMD ["npm", "run", "dev", "--", "--port", "8080", "--host"]
