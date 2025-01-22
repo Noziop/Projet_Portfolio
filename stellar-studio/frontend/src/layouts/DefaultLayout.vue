@@ -1,23 +1,50 @@
 <template>
-    <v-app>
-      <v-app-bar app>
-        <v-app-bar-title>Stellar Studio</v-app-bar-title>
-        <v-spacer></v-spacer>
-        <v-btn to="/">Home</v-btn>
-        <v-btn to="/processing">Processing</v-btn>
-      </v-app-bar>
+  <v-app>
+    <app-header @show-notification="showNotification" />
+    
+    <v-main>
+      <slot></slot>
+    </v-main>
+
+    <app-footer />
+
+    <!-- Snackbar pour les notifications -->
+    <v-snackbar
+      v-model="showNotificationBar"
+      :color="notificationColor"
+      :timeout="3000"
+    >
+      {{ notificationText }}
+    </v-snackbar>
+  </v-app>
+</template>
+
+<script>
+import AppHeader from '../components/layout/AppHeader.vue'
+import AppFooter from '../components/layout/AppFooter.vue'
+
+export default {
+  name: 'DefaultLayout',
   
-      <v-main>
-        <v-container>
-          <slot></slot>
-        </v-container>
-      </v-main>
-    </v-app>
-  </template>
-  
-  <script>
-  export default {
-    name: 'DefaultLayout'
+  components: {
+    AppHeader,
+    AppFooter
+  },
+
+  data() {
+    return {
+      showNotificationBar: false,
+      notificationText: '',
+      notificationColor: 'success'
+    }
+  },
+
+  methods: {
+    showNotification({ text, color }) {
+      this.notificationText = text
+      this.notificationColor = color
+      this.showNotificationBar = true
+    }
   }
-  </script>
-  
+}
+</script>
