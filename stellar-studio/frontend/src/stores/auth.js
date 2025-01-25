@@ -3,9 +3,9 @@ import AuthService from '../services/auth.service'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: null,
+    user: JSON.parse(localStorage.getItem('user')) || null,
     token: localStorage.getItem('token') || null,
-    isAuthenticated: false
+    isAuthenticated: !!localStorage.getItem('token')
   }),
 
   actions: {
@@ -38,6 +38,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const data = await AuthService.getMe()
         this.user = data
+        localStorage.setItem('user', JSON.stringify(data))
         return data
       } catch (error) {
         console.error('GetMe error:', error)
@@ -60,7 +61,12 @@ export const useAuthStore = defineStore('auth', {
       this.token = null
       this.isAuthenticated = false
       localStorage.removeItem('token')
+      localStorage.removeItem('user')
       AuthService.setAuthHeader(null)
+    },
+
+    checkAuth() {
+      return this.isAuthenticated && !!this.token
     }
   }
 })

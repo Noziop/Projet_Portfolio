@@ -1,6 +1,12 @@
 <template>
+  <default-layout>
+    <animated-stars :star-count="800" />
+    <nebula-effect />
     <v-container fluid class="auth-page">
-      <div :class="['container', { 'panel-active': isPanelActive }]" id="container">
+      <div :class="['container', { 'panel-active': isPanelActive }]" 
+           v-show="showForm"
+           :style="{ opacity: formOpacity }"
+           id="container">
         <!-- Panneau de connexion (gauche) -->
         <div class="form-container sign-in-container">
           <form @submit.prevent="handleLogin">
@@ -30,8 +36,8 @@
             <button type="submit" class="submit-btn">Se connecter</button>
           </form>
         </div>
-  
-        <!-- Panneau d'inscription (apparaît après glissement) -->
+
+        <!-- Panneau d'inscription -->
         <div class="form-container sign-up-container">
           <form @submit.prevent="handleRegister">
             <h1>Créer un compte</h1>
@@ -68,12 +74,11 @@
             <button type="submit" class="submit-btn">S'inscrire</button>
           </form>
         </div>
-  
-        <!-- Panneau overlay avec animation -->
+
+        <!-- Panneau overlay -->
         <div class="overlay-container">
           <div class="overlay">
             <div class="overlay-panel overlay-left">
-              <h1>Vous avez déjà un compte ?</h1>  
               <h1>Content de vous revoir !</h1>
               <p>Connectez-vous pour continuer votre voyage parmi les étoiles</p>
               <button class="ghost" @click="isPanelActive = false">Se connecter</button>
@@ -86,44 +91,65 @@
           </div>
         </div>
       </div>
-      <!-- Snackbar pour les notifications -->
-  <v-snackbar
-    v-model="snackbar.show"
-    :color="snackbar.color"
-    :timeout="3000"
-    location="top right"
-  >
-    {{ snackbar.text }}
-    <template v-slot:actions>
-      <v-btn
-        variant="text"
-        @click="snackbar.show = false"
+
+      <!-- Snackbar -->
+      <v-snackbar
+        v-model="snackbar.show"
+        :color="snackbar.color"
+        :timeout="3000"
+        location="top right"
       >
-        Fermer
-      </v-btn>
-    </template>
-  </v-snackbar>
+        {{ snackbar.text }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="snackbar.show = false">
+            Fermer
+          </v-btn>
+        </template>
+      </v-snackbar>
     </v-container>
-  </template>
+  </default-layout>
+</template>
+
+<script>
+import { useAuthStore } from '../../stores/auth'
+import { ref, onMounted } from 'vue'
+import DefaultLayout from '../../layouts/DefaultLayout.vue'
+import AnimatedStars from '../../components/AnimatedStars.vue'
+import NebulaEffect from '../../components/NebulaEffect.vue'
+
+export default {
+  name: 'AuthContainer',
   
-  <script>
-  import { useAuthStore } from '../../stores/auth'
-  import { ref } from 'vue'
-  
-  export default {
-    name: 'AuthContainer',
+  components: {
+    DefaultLayout,
+    AnimatedStars,
+    NebulaEffect
+  },
+
+  setup() {
+    const authStore = useAuthStore()
+    const isPanelActive = ref(false)
+    const showForm = ref(false)
+    const formOpacity = ref(0)
+
+    onMounted(() => {
+      setTimeout(() => {
+        showForm.value = true
+        setTimeout(() => {
+          formOpacity.value = 1
+        }, 100)
+      }, 300)
+    })
     
-    setup() {
-      const authStore = useAuthStore()
-      const isPanelActive = ref(false)
-      
-      return {
-        isPanelActive,
-        authStore
-      }
-    },
-  
-    data() {
+    return {
+      isPanelActive,
+      authStore,
+      showForm,
+      formOpacity
+    }
+  },
+
+  data() {
     return {
       loading: false,
       loginForm: {
@@ -150,21 +176,24 @@
       this.snackbar.show = true
     },
 
-      async handleLogin() {
-        if (!this.loginForm.username || !this.loginForm.password) return
-        
-        this.loading = true
-        try {
-          await this.authStore.login(this.loginForm.username, this.loginForm.password)
-          this.$router.push('/')
-        } catch (error) {
-          console.error('Login error:', error)
-        } finally {
-          this.loading = false
-        }
-      },
-  
-      async handleRegister() {
+    async handleLogin() {
+      if (!this.loginForm.username || !this.loginForm.password) {
+        this.showNotification('Veuillez remplir tous les champs', 'error')
+        return
+      }
+      
+      this.loading = true
+      try {
+        await this.authStore.login(this.loginForm.username, this.loginForm.password)
+        this.$router.push('/')
+      } catch (error) {
+        this.showNotification(error.response?.data?.detail || 'Erreur de connexion', 'error')
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async handleRegister() {
       if (!this.registerForm.username || !this.registerForm.email || !this.registerForm.password) {
         this.showNotification('Veuillez remplir tous les champs', 'error')
         return
@@ -174,7 +203,6 @@
       try {
         await this.authStore.register(this.registerForm)
         this.showNotification('Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
-        // Attendre que la notification soit visible avant de glisser
         setTimeout(() => {
           this.isPanelActive = false
         }, 1000)
@@ -194,7 +222,8 @@
   
   <style scoped>
 .auth-page {
-  min-height: 100vh;
+  min-height: calc(90vh - 64px); /* Ajuster pour le header */
+  padding-top: 32px; /* Espace pour le header */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,6 +240,8 @@
   overflow: hidden;
   box-shadow: 5px 10px 20px rgba(255, 105, 180, 0.2);
   backdrop-filter: blur(5px);
+  transform: scale(0.9);
+  transition: opacity 0.6s ease-in-out;
 }
 
 .form-container {

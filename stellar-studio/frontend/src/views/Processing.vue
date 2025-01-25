@@ -86,78 +86,112 @@
   </template>
   
   <script>
-  import DefaultLayout from '../layouts/DefaultLayout.vue'
-  import ObjectSelector from '../components/ObjectSelector.vue'
-  import ProcessingControls from '../components/ProcessingControls.vue'
-  import ImageViewer from '../components/ImageViewer.vue'
-  
-  export default {
-    name: 'Processing',
-    components: {
-      DefaultLayout,
-      ObjectSelector,
-      ProcessingControls,
-      ImageViewer
+import DefaultLayout from '../layouts/DefaultLayout.vue'
+import ObjectSelector from '../components/ObjectSelector.vue'
+import ProcessingControls from '../components/ProcessingControls.vue'
+import ImageViewer from '../components/ImageViewer.vue'
+
+export default {
+  name: 'Processing',
+  components: {
+    DefaultLayout,
+    ObjectSelector,
+    ProcessingControls,
+    ImageViewer
+  },
+  data() {
+    return {
+      currentImage: null,
+      processingHistory: [],
+      processingStatus: null,
+      snackbar: {
+        show: false,
+        text: '',
+        color: 'info'
+      }
+    }
+  },
+  methods: {
+    handleDownloadStarted(data) {
+      this.showNotification(`Download started for task ${data.taskId}`, 'info')
+      this.addToHistory({
+        description: `Started download: ${data.message}`,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'pending'
+      })
     },
-    data() {
-      return {
-        currentImage: null,
-        processingHistory: [],
-        processingStatus: null,
-        snackbar: {
-          show: false,
-          text: '',
-          color: 'info'
-        }
+
+    handleDownloadComplete(result) {
+      this.showNotification('Download complete', 'success')
+      if (result && result.files && result.files.length > 0) {
+        this.currentImage = result.files[0]
+      }
+      this.addToHistory({
+        description: 'Download completed successfully',
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'success'
+      })
+      this.processingStatus = {
+        text: 'Ready',
+        color: 'success'
       }
     },
-    methods: {
-      handleDownloadStarted(data) {
-        this.showNotification('Download started', 'info')
-        this.addToHistory({
-          description: `Started download: ${data.message}`,
-          timestamp: new Date().toLocaleTimeString(),
-          status: 'pending'
-        })
-      },
-      handleProcessing(params) {
-        this.processingStatus = {
-          text: 'Processing...',
-          color: 'info'
-        }
-        // TODO: Implement actual processing logic
-        this.addToHistory({
-          description: `Applied ${params.workflow} processing`,
-          timestamp: new Date().toLocaleTimeString(),
-          status: 'success'
-        })
-      },
-      handleParameterUpdate(params) {
-        // TODO: Handle real-time parameter updates
-        console.log('Parameters updated:', params)
-      },
-      revertToState(index) {
-        // TODO: Implement state reversion
-        this.showNotification('Reverted to previous state', 'success')
-      },
-      addToHistory(action) {
-        this.processingHistory.unshift(action)
-      },
-      showNotification(text, color = 'info') {
-        this.snackbar = {
-          show: true,
-          text,
-          color
-        }
+
+    handleError(message) {
+      this.showNotification(message, 'error')
+      this.addToHistory({
+        description: `Error: ${message}`,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'error'
+      })
+      this.processingStatus = {
+        text: 'Error',
+        color: 'error'
+      }
+    },
+
+    handleProcessing(params) {
+      this.processingStatus = {
+        text: 'Processing...',
+        color: 'info'
+      }
+      // TODO: Implement actual processing logic
+      this.addToHistory({
+        description: `Applied ${params.workflow} processing`,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'success'
+      })
+    },
+
+    handleParameterUpdate(params) {
+      // TODO: Handle real-time parameter updates
+      console.log('Parameters updated:', params)
+    },
+
+    revertToState(index) {
+      // TODO: Implement state reversion
+      this.showNotification('Reverted to previous state', 'success')
+    },
+
+    addToHistory(action) {
+      this.processingHistory.unshift(action)
+    },
+
+    showNotification(text, color = 'info') {
+      this.snackbar = {
+        show: true,
+        text,
+        color
       }
     }
   }
-  </script>
+}
+</script>
   
-  <style scoped>
+<style scoped>
   .v-timeline {
     max-height: 300px;
     overflow-y: auto;
   }
-  </style>
+</style>
   

@@ -26,9 +26,9 @@
               <v-btn
                 color="pink-accent-2"
                 variant="tonal"
-                @click="$router.push('/processing')"
+                @click="$router.push('/telescopes')"
               >
-                Start Processing
+                Browse Telescopes
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -49,7 +49,7 @@
                 variant="tonal"
                 @click="$router.push('/processing')"
               >
-                View Tools
+                Start Processing
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -115,7 +115,7 @@ export default {
     AnimatedStars,
     NebulaEffect
   },
-  
+
   setup() {
     const authStore = useAuthStore()
     const { isAuthenticated } = storeToRefs(authStore)

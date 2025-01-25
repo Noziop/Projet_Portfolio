@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install  # Au lieu de npm ci
+RUN npm install --legacy-peer-deps
 
 # Ajouter un utilisateur non-root et donner les permissions
 RUN adduser -D nodeuser && \

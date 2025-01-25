@@ -107,17 +107,9 @@ def get_target_preview(object_name: str, telescope: str):
         return None
 
 def get_available_targets(telescope: str):
-    """Retourne la liste des cibles avec leurs previews pour un télescope"""
-    telescope_targets = targets.get(telescope, [])
-    result = []
-    
-    for target in telescope_targets:
-        target_copy = target.copy()  # Évite de modifier le dictionnaire original
-        preview_url = get_target_preview(target_copy['id'], telescope)
-        target_copy['preview_url'] = preview_url
-        result.append(target_copy)
-        
-    return result
+    """Retourne la liste des cibles pour un télescope"""
+    return targets.get(telescope, [])
+
 
 @celery_app.task(name='app.services.telescope_service.fetch_object_data')
 def fetch_object_data(object_name: str):

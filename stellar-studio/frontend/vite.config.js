@@ -8,8 +8,10 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://backend:8000',  // On pointe directement vers le service backend
-        changeOrigin: true
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api')  // Garde le préfixe /api
       }
     }
   }
