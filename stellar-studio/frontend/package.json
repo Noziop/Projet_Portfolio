@@ -15,7 +15,8 @@
     "pinia": "^2.1.0",
     "@mdi/font": "^7.3.67",
     "three": "^0.158.0",
-    "plotly.js-dist": "^2.27.0"
+    "plotly.js-dist": "^2.27.0",
+    "simplex-noise": "4.0.3"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",

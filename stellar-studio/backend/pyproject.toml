@@ -1,16 +1,8 @@
-[project]
+[tool.poetry]
 name = "stellar-studio"
 version = "0.1.0"
 description = "Astrophotography Processing Platform"
-authors = [
-    {name = "Noziop", email = "contact@fassih.ch"}
-]
-requires-python = "^3.9"
-
-[project.dynamic]
-dependencies = true
-
-[tool.poetry]
+authors = ["Noziop <contact@fassih.ch>"]
 package-mode = false
 
 [tool.poetry.dependencies]
