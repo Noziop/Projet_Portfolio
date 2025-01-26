@@ -13,10 +13,10 @@ class JobStatus(enum.Enum):
 class ProcessingJob(Base):
     __tablename__ = "processing_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(CHAR(36), ForeignKey("users.id"), nullable=False)
-    telescope_id = Column(Integer, ForeignKey("space_telescopes.id"), nullable=False)
-    workflow_id = Column(Integer, ForeignKey("workflows.id"), nullable=False)
+    id = Column(String(36), primary_key=True)  # Changé en String(36)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    telescope_id = Column(String(36), ForeignKey("space_telescopes.id"), nullable=False)  # Changé en String(36)
+    workflow_id = Column(String(36), ForeignKey("workflows.id"), nullable=False)  # Changé en String(36)
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
