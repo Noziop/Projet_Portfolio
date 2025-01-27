@@ -27,6 +27,21 @@
 - User administration dashboard
 - Image gallery system
 
+#### Interface Design
+
+##### Splash Screen
+![Splash Screen](../assets/mockups/splash_screen.png)
+
+##### Login Interface
+![Login Interface](../assets/mockups/login.png)
+
+##### Home Dashboard
+![Home Dashboard](../assets/mockups/home.png)
+
+##### Processing Pipeline
+![Processing Interface](../assets/mockups/processing.png)
+
+
 ### Backend Services
 - Authentication and authorization
 - Image processing pipeline
