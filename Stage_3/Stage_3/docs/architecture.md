@@ -3,48 +3,97 @@
 ## System Overview
 ![System Architecture](../assets/diagrams/system-overview.png)
 
+### Design Principles
+- Modular architecture
+- Secure by design
+- Scalable infrastructure
+- Performance-oriented processing
+
+### System Requirements
+- Reliable service availability
+- Efficient image processing pipeline
+- Secure data handling
+- Scalable user management
+
 ## Component Interactions
 ![Component Flow](../assets/diagrams/component-flow.png)
+
+## System Architecture
+![Deployment Diagram](../assets/schemas/deployement_diagram.png)
+
+### Frontend Architecture
+- Target selection interface
+- Processing workflow management
+- User administration dashboard
+- Image gallery system
+
+### Backend Services
+- Authentication and authorization
+- Image processing pipeline
+- Astronomical catalog integration
+- Data management system
+
+## Data Architecture
+![Class Diagram](../assets/schemas/Class-Diagram.png)
+
+## Data Flow Overview
+![Data Flow Diagram](../assets/schemas/data_flow_diagram.png)
 
 ## Key Workflows
 
 ### Authentication Flow
 ![Authentication Sequence](../assets/diagrams/auth-sequence.png)
 
-Key authentication features:
-- JWT-based authentication
-- Session management with Redis
-- Secure password handling
-- Role-based access control
+Key security features:
+- Token-based authentication
+- Session management
+- Secure credential handling
+- Role-based permissions
 
 ### Data Processing Flow
 ![Data Processing Sequence](../assets/diagrams/data-flow-sequence.png)
+![Processing Flow](../assets/schemas/image_processing_flow.png)
 
-MVP processing features:
-- NASA/MAST catalog integration
-- Automated pre-processing pipeline
-- HST/JWST data handling
-- Optimized storage management
+Core processing features:
+- NASA/MAST data integration
+- Automated pre-processing
+- Scientific image handling
+- Storage optimization
 
 ## Infrastructure Components
 
 ### Storage Layer
-- **MinIO**: Object storage for processed images
-- **MariaDB**: 
-  - User profiles and authentication
-  - Processing workflow configurations
-  - Image metadata and catalog data
-  - Target information
+- Object storage system
+- Relational database
+- Metadata management
+- Backup solutions
 
 ### Processing Layer
-- **Celery**: Asynchronous task processing
-- **Redis**: 
-  - Session management
-  - Task queue broker
-  - Result backend
-- **AstroPy**: Core astronomical data handling
+- Task processing system
+- Resource management
+- Scientific computations
+- Results handling
 
 ### API Layer
-- **FastAPI**: RESTful API implementation
-- **JWT**: Token-based authentication
-- **OpenAPI**: API documentation and testing
+- RESTful architecture
+- Security implementations
+- Performance optimization
+- System documentation
+
+## Deployment Strategy
+### Development Environment
+- Containerized development
+- Local storage systems
+- Database management
+- API integrations
+
+### Production Environment
+- Container orchestration
+- Load balancing
+- System monitoring
+
+### Future Considerations
+- Enhanced scaling solutions
+- Advanced testing implementation
+- Security enhancements
+- Development workflow optimization
