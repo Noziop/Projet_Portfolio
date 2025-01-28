@@ -1,5 +1,6 @@
 # app/api/deps.py
 from typing import Generator
+from functools import wraps
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.session import SessionManager
 from app.db.session import SessionLocal
-from app.models.user import User
+from app.domain.models.user import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 session_manager = SessionManager()
@@ -47,3 +48,16 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+def require_role(*roles: UserRole):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, current_user: User = Depends(get_current_user), **kwargs):
+            if current_user.role not in roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Permission denied",
+                )
+            return await func(*args, current_user=current_user, **kwargs)
+        return wrapper
+    return decorator
