@@ -12,13 +12,12 @@ api_router.include_router(
     tags=["auth"]
 )
 
-# Routes publiques des télescopes (avec auth requise)
 api_router.include_router(
     telescopes.router,
-    prefix="/telescopes",
     tags=["telescopes"],
     dependencies=[Depends(get_current_user)]
 )
+
 
 # Routes d'administration des télescopes
 api_router.include_router(

@@ -1,5 +1,5 @@
 # services/task_manager.py
-from app.models.task import Task
+from app.domain.models.task import Task
 from app.core.celery import celery_app
 from app.db.session import SessionLocal
 

@@ -1,53 +1,32 @@
+# app/schemas/telescope.py
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Dict, Optional
 from datetime import datetime
-from uuid import UUID
 
 class TelescopeBase(BaseModel):
-    name: str = Field(..., description="Nom du télescope")
-    description: Optional[str] = Field(None, description="Description du télescope")
-    aperture: float = Field(..., description="Ouverture en millimètres", gt=0)
-    focal_length: float = Field(..., description="Longueur focale en millimètres", gt=0)
-    location: str = Field(..., description="Localisation du télescope")
-    instruments: Dict[str, dict] = Field(
-        default_factory=dict,
-        description="Instruments attachés au télescope"
-    )
+    name: str
+    description: Optional[str] = None
+    aperture: str  # Changé de float à str car stocké comme "2.4m"
+    focal_length: str  # Changé de float à str car stocké comme "57.6m"
+    location: str
+    instruments: Dict[str, str]  # Changé pour accepter string->string
+    api_endpoint: str
 
 class TelescopeCreate(TelescopeBase):
-    pass
+    id: str  # On utilise str au lieu de UUID car on a des IDs comme "HST"
 
 class TelescopeUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    aperture: Optional[float] = Field(None, gt=0)
-    focal_length: Optional[float] = Field(None, gt=0)
+    aperture: Optional[str] = None
+    focal_length: Optional[str] = None
     location: Optional[str] = None
-    instruments: Optional[Dict[str, dict]] = None
+    instruments: Optional[Dict[str, str]] = None
+    api_endpoint: Optional[str] = None
 
 class TelescopeResponse(TelescopeBase):
-    id: UUID
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    is_active: bool = True
-
+    id: str
+    
     model_config = {
-        "from_attributes": True,
-        "json_schema_extra": {
-            "example": {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
-                "name": "Hubble Space Telescope",
-                "description": "NASA's flagship space telescope",
-                "aperture": 2400.0,
-                "focal_length": 57600.0,
-                "location": "Low Earth Orbit",
-                "instruments": {
-                    "WFC3": {"type": "camera", "wavelength": "visible/IR"},
-                    "COS": {"type": "spectrograph", "wavelength": "UV"}
-                },
-                "created_at": "2024-01-28T00:00:00",
-                "updated_at": None,
-                "is_active": True
-            }
-        }
+        "from_attributes": True
     }
