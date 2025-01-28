@@ -1,4 +1,3 @@
-# app/schemas/user.py
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
@@ -9,12 +8,18 @@ class UserLevel(str, Enum):
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
 
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    OPERATOR = "operator"
+    USER = "user"
+
 class UserBase(BaseModel):
     email: EmailStr
     username: str
     firstname: Optional[str] = None
     lastname: Optional[str] = None
     level: UserLevel = UserLevel.BEGINNER
+    role: UserRole = UserRole.USER
 
 class UserCreate(UserBase):
     password: str  # Required for local auth
@@ -29,11 +34,21 @@ class User(UserBase):
     created_at: datetime
     last_login: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class UserInDB(User):
     hashed_password: str
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    level: Optional[UserLevel] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
 
 class PasswordChange(BaseModel):
     old_password: str
