@@ -1,12 +1,11 @@
-# app/infrastructure/repositories/user_repository.py
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 import uuid
 
 from .base_repository import BaseRepository
-from ..repositories.models.user import User as UserModel, UserLevel as DBUserLevel
-from app.domain.models.user import User, UserLevel
+from ..repositories.models.user import User as UserModel, UserLevel as DBUserLevel, UserRole as DBUserRole
+from app.domain.models.user import User, UserLevel, UserRole
 
 class UserRepository(BaseRepository[User]):
     def __init__(self, db_session: Session):
@@ -26,6 +25,7 @@ class UserRepository(BaseRepository[User]):
             username=db_user.username,
             firstname=db_user.firstname,
             lastname=db_user.lastname,
+            role=UserRole[db_user.role.name],
             level=UserLevel[db_user.level.name],
             created_at=db_user.created_at,
             last_login=db_user.last_login,
@@ -46,6 +46,7 @@ class UserRepository(BaseRepository[User]):
             username=db_user.username,
             firstname=db_user.firstname,
             lastname=db_user.lastname,
+            role=UserRole[db_user.role.name],
             level=UserLevel[db_user.level.name],
             created_at=db_user.created_at,
             last_login=db_user.last_login,
@@ -60,6 +61,7 @@ class UserRepository(BaseRepository[User]):
             hashed_password=hashed_password,  # Géré séparément du modèle de domaine
             firstname=user.firstname,
             lastname=user.lastname,
+            role=DBUserRole[user.role.name],
             level=DBUserLevel[user.level.name],
             created_at=user.created_at,
             last_login=user.last_login,
@@ -76,6 +78,7 @@ class UserRepository(BaseRepository[User]):
             username=db_user.username,
             firstname=db_user.firstname,
             lastname=db_user.lastname,
+            role=UserRole[db_user.role.name],
             level=UserLevel[db_user.level.name],
             created_at=db_user.created_at,
             last_login=db_user.last_login,
@@ -94,6 +97,7 @@ class UserRepository(BaseRepository[User]):
         db_user.username = user.username
         db_user.firstname = user.firstname
         db_user.lastname = user.lastname
+        db_user.role = DBUserRole[user.role.name]
         db_user.level = DBUserLevel[user.level.name]
         db_user.last_login = user.last_login
         db_user.is_active = user.is_active

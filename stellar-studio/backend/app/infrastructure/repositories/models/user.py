@@ -11,6 +11,11 @@ class UserLevel(enum.Enum):
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
 
+class UserRole(enum.Enum):
+    ADMIN = "admin"
+    OPERATOR = "operator"
+    USER = "user"
+
 def generate_uuid():
     return str(uuid.uuid4())
 
@@ -24,6 +29,7 @@ class User(Base):
     firstname = Column(String(100), nullable=True)
     lastname = Column(String(100), nullable=True)
     level = Column(Enum(UserLevel), default=UserLevel.BEGINNER)
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
     created_at = Column(DateTime, server_default=func.now())
     last_login = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)

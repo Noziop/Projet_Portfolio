@@ -1,8 +1,12 @@
-# app/domain/models/user.py
+from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 from typing import Optional
+
+class UserRole(Enum):
+    ADMIN = "admin"
+    OPERATOR = "operator"
+    USER = "user"
 
 class UserLevel(Enum):
     BEGINNER = "beginner"
@@ -16,6 +20,7 @@ class User:
     username: str
     firstname: Optional[str]
     lastname: Optional[str]
+    role: UserRole  # Ajout du champ role
     level: UserLevel
     created_at: datetime
     last_login: Optional[datetime]
