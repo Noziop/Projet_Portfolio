@@ -2,13 +2,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import List
-from app.services.auth_service import AuthService
+from app.services.auth import auth_service
 from app.schemas.user import UserCreate, User, Token, PasswordChange, UserUpdate
 from app.api.deps import get_current_user, require_role
 from app.domain.models.user import UserRole
 
 router = APIRouter()
-auth_service = AuthService()
 
 @router.post("/register", response_model=User)
 async def register(user_in: UserCreate):
