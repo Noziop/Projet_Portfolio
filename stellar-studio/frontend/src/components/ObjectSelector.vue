@@ -58,7 +58,7 @@ export default {
       
       loading.value = true
       try {
-        const response = await apiClient.get(`/telescopes/telescopes/${selectedTelescope.value}/targets`)
+        const response = await apiClient.get(`/observations/${selectedTelescope.value}/targets`)
         availableTargets.value = response.data
       } catch (error) {
         console.error('Failed to load targets:', error)
@@ -73,7 +73,7 @@ export default {
 
       downloadLoading.value = true
       try {
-        const response = await apiClient.get(`/telescopes/objects/${selectedTarget.value}/fits`, {
+        const response = await apiClient.get(`/observations/download/${selectedTelescope.value}}/${selectedTarget.value}`, {
           params: { telescope: selectedTelescope.value }
         })
         

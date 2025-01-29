@@ -1,7 +1,8 @@
 # app/schemas/telescope.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Json
 from typing import Dict, Optional
 from datetime import datetime
+
 
 class TelescopeBase(BaseModel):
     name: str
@@ -9,7 +10,7 @@ class TelescopeBase(BaseModel):
     aperture: str  # Changé de float à str car stocké comme "2.4m"
     focal_length: str  # Changé de float à str car stocké comme "57.6m"
     location: str
-    instruments: Dict[str, str]  # Changé pour accepter string->string
+    instruments: Json[Dict[str, str]]  # Changé pour accepter string->string
     api_endpoint: str
 
 class TelescopeCreate(TelescopeBase):
