@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
+import re
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -22,7 +23,32 @@ class UserBase(BaseModel):
     role: UserRole = UserRole.USER
 
 class UserCreate(UserBase):
-    password: str  # Required for local auth
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=100,
+        description="Mot de passe de l'utilisateur"
+    )
+    
+    @field_validator('password')
+    def password_complexity(cls, v):
+        """Vérifie la complexité du mot de passe"""
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Le mot de passe doit contenir au moins une majuscule')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Le mot de passe doit contenir au moins une minuscule')
+        if not re.search(r'[0-9]', v):
+            raise ValueError('Le mot de passe doit contenir au moins un chiffre')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('Le mot de passe doit contenir au moins un caractère spécial')
+        return v
+
+    @field_validator('username')
+    def username_alphanumeric(cls, v):
+        """Vérifie que le username est alphanumérique"""
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('Le username ne peut contenir que des lettres, chiffres, tirets et underscores')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr

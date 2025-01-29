@@ -25,10 +25,10 @@ class User(Base):
     id = Column(CHAR(36), primary_key=True, default=generate_uuid)
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)  # Restera dans le modèle SQL uniquement
+    hashed_password = Column(String(255), nullable=False)
     firstname = Column(String(100), nullable=True)
     lastname = Column(String(100), nullable=True)
-    level = Column(Enum(UserLevel), default=UserLevel.BEGINNER)
+    level = Column(Enum(UserLevel), nullable=False, default=UserLevel.BEGINNER)  
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
     created_at = Column(DateTime, server_default=func.now())
     last_login = Column(DateTime, nullable=True)
