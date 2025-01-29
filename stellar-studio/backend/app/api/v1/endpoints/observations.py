@@ -1,15 +1,14 @@
 # app/api/v1/endpoints/observations.py
 from fastapi import APIRouter, Depends, HTTPException
-from app.services.task_manager import TaskManager
+from app.services.observation import observation_service
 from app.api.deps import get_current_user
-from app.services.telescope_service import get_target_preview, get_available_targets
 
 router = APIRouter()
 
 @router.get("/{telescope}/targets")
 async def list_telescope_targets(telescope: str):
     """Liste les cibles disponibles pour un télescope donné"""
-    targets = get_available_targets(telescope)
+    targets = observation_service.get_available_targets(telescope)
     if not targets:
         raise HTTPException(status_code=404, detail=f"No targets found for telescope {telescope}")
     return targets
@@ -17,17 +16,7 @@ async def list_telescope_targets(telescope: str):
 @router.get("/preview/{telescope}/{object_name}")
 async def get_object_preview(telescope: str, object_name: str):
     """Récupère l'URL de preview pour un objet spécifique"""
-    preview_url = get_target_preview(object_name, telescope)
+    preview_url = observation_service.get_target_preview(object_name, telescope)
     if not preview_url:
         raise HTTPException(status_code=404, detail=f"No preview available for {object_name}")
     return {"preview_url": preview_url}
-
-@router.post("/download")
-async def start_download(telescope: str, object_name: str, current_user = Depends(get_current_user)):
-    """Initie un téléchargement d'observation"""
-    task = await TaskManager.create_task(
-        current_user.id,
-        "download_fits",
-        {"telescope": telescope, "object_name": object_name}
-    )
-    return {"task_id": task.id}

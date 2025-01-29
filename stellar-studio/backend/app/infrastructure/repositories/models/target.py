@@ -15,3 +15,15 @@ class Target(Base):
     coordinates_dec = Column(String(50), nullable=False)
     object_type = Column(String(100), nullable=False)  # 'nebula', 'galaxy', etc.
     extra_data = Column(JSON, nullable=True)  # Renommé de metadata à extra_data
+
+    def to_dict(self):
+        """Convertit l'instance Target en dictionnaire"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'telescope_id': self.telescope_id,
+            'coordinates_ra': self.coordinates_ra,
+            'coordinates_dec': self.coordinates_dec,
+            'object_type': self.object_type
+        }

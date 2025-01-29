@@ -8,10 +8,11 @@ from typing import Optional, Dict, Any
 class StorageService:
     def __init__(self):
         self.client = Minio(
-            os.getenv('MINIO_URL', 'minio:9000'),
+            # Utiliser uniquement le hostname:port sans chemin
+            os.getenv('MINIO_URL', 'minio:9000').replace('http://', ''),
             access_key=os.getenv('MINIO_ACCESS_KEY', 'minioadmin'),
             secret_key=os.getenv('MINIO_SECRET_KEY', 'minioadmin'),
-            secure=False
+            secure=False  # False car nous n'utilisons pas HTTPS en local
         )
         self.fits_bucket = "fits-files"
         self._ensure_bucket_exists(self.fits_bucket)
