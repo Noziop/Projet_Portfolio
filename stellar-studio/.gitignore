@@ -54,3 +54,4 @@ data/
 downloads/
 *.fits
 *.log
+telescope_service.txt
