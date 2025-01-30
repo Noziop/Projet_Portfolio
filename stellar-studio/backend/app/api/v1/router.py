@@ -1,7 +1,7 @@
 # app/api/v1/router.py
 from fastapi import APIRouter, Depends
 from app.api.deps import get_current_user
-from app.api.v1.endpoints import auth, telescopes, telescope_management, objects, observations, tasks
+from app.api.v1.endpoints import auth, telescopes, telescope_management, objects, observations, tasks, health
 
 api_router = APIRouter()
 
@@ -41,4 +41,10 @@ api_router.include_router(
     objects.router,
     prefix="/objects",
     tags=["objects"]
+)
+
+api_router.include_router(
+    health.router,
+    prefix="/health",
+    tags=["health"]
 )

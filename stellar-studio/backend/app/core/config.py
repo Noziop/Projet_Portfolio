@@ -8,29 +8,29 @@ env_path = Path(__file__).parents[2] / '.env'
 
 class Settings(BaseSettings):
     # Base
-    PROJECT_NAME: str = "Stellar Studio"
+    PROJECT_NAME: str = "Stellar Studio"  # On peut garder celle-ci par défaut
     API_V1_STR: str = "/api/v1"
     
     # Database
-    DATABASE_USER: str = "stellaruser"
-    DATABASE_PASSWORD: str = "stellarpassword"
-    DATABASE_HOST: str = "database"
-    DATABASE_PORT: str = "3306"
-    DATABASE_NAME: str = "stellarstudio"
+    DATABASE_USER: str
+    DATABASE_PASSWORD: str
+    DATABASE_HOST: str
+    DATABASE_PORT: str
+    DATABASE_NAME: str
     
     # Redis
-    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_URL: str
     REDIS_SESSION_DB: int = 1
     
     # JWT
-    SECRET_KEY: str = "your-super-secret-key-change-in-production"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # MinIO
-    MINIO_URL: str = "minio:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_URL: str
+    MINIO_ACCESS_KEY: str
+    MINIO_SECRET_KEY: str
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:

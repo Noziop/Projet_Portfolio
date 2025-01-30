@@ -1,6 +1,6 @@
 # app/api/v1/endpoints/tasks.py
 from fastapi import APIRouter, Depends
-from app.services.task import task_service
+from app.services.task import task_service, download_fits
 from app.api.deps import get_current_user
 from app.schemas.task import DownloadRequest
 
@@ -17,7 +17,7 @@ async def start_download(
     current_user = Depends(get_current_user)
 ):
     """Initie un téléchargement d'observation"""
-    task = task_service.download_fits.delay(
+    task = download_fits.delay(
     object_name=request.object_name, 
     telescope=request.telescope
     )

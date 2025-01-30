@@ -28,6 +28,8 @@ services:
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
     depends_on:
       - backend
+    env_file:
+      - .env
 
   grafana:
     image: grafana/grafana-oss
@@ -38,13 +40,15 @@ services:
       - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=stellarpassword
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     depends_on:
       - prometheus
+    env_file:
+      - .env
       
   backend:
     build: ./backend
@@ -54,14 +58,8 @@ services:
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
     volumes:
       - ./backend:/app
-      - ./downloads:/app/downloads
+      - ./tmp:/app/tmp
     user: "1000:1000"
-    environment:
-      - DATABASE_URL=mysql://stellaruser:stellarpassword@database:3306/stellarstudio
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MINIO_URL=http://minio:9000
     env_file:
       - .env
     depends_on:
@@ -74,6 +72,11 @@ services:
       replicas: 2
       restart_policy:
         condition: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   celery_worker:
     build: 
@@ -81,10 +84,9 @@ services:
       dockerfile: Dockerfile.celery
     volumes:
       - ./backend:/app
-      - ./downloads:/app/downloads
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - ./tmp:/app/tmp
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -95,6 +97,11 @@ services:
       replicas: 4
       restart_policy:
         condition: on-failure
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   minio:
     image: minio/minio:latest
@@ -103,8 +110,9 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
     volumes:
       - minio-data:/data
     labels:
@@ -116,6 +124,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    env_file:
+      - .env
 
   frontend:
     build: ./frontend
@@ -128,14 +138,16 @@ services:
       - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
+    env_file:
+      - .env
 
   database:
     image: mariadb:10.5
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: stellarstudio
-      MYSQL_USER: stellaruser
-      MYSQL_PASSWORD: stellarpassword
+      MYSQL_ROOT_PASSWORD: ${DATABASE_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
       - ./data/mysql:/var/lib/mysql
     healthcheck:
@@ -143,6 +155,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    env_file:
+      - .env
 
   redis:
     image: redis:7-alpine
@@ -154,10 +168,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    env_file:
+      - .env
 
 volumes:
   grafana-data:
   prometheus-data:
   minio-data:
-  downloads:
+    driver: local
   frontend_node_modules:
+  tmp:
+    driver: local

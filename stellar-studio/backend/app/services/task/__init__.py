@@ -1,5 +1,6 @@
-from .service import TaskService
+from .service import TaskService, download_fits
 
 task_service = TaskService()
 
-__all__ = ['task_service']
+__all__ = ['task_service',
+           'download_fits']
