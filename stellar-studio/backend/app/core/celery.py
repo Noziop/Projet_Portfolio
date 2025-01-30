@@ -5,7 +5,7 @@ celery_app = Celery(
     "stellar_studio",
     broker="redis://redis:6379/0",
     backend="redis://redis:6379/0",
-    include=['app.services.telescope_service']
+    include=['app.services.task.service']
 )
 
 celery_app.conf.update(

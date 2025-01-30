@@ -47,6 +47,7 @@ export default {
     const availableTargets = ref([])
     const loading = ref(false)
     const downloadLoading = ref(false)
+    const downloadStatus = ref('idle') // 'idle', 'downloading', 'success', 'error'
 
     const telescopes = [
       { id: 'HST', name: 'Hubble Space Telescope' },
@@ -62,7 +63,7 @@ export default {
         availableTargets.value = response.data
       } catch (error) {
         console.error('Failed to load targets:', error)
-        emit('error', 'Failed to load targets')
+        emit('error', 'Échec du chargement des cibles')
       } finally {
         loading.value = false
       }
@@ -72,40 +73,68 @@ export default {
       if (!selectedTarget.value || !selectedTelescope.value) return
 
       downloadLoading.value = true
+      downloadStatus.value = 'downloading'
+      
       try {
-        const response = await apiClient.get(`/observations/download/${selectedTelescope.value}}/${selectedTarget.value}`, {
-          params: { telescope: selectedTelescope.value }
+        // Trouver le target sélectionné pour avoir son nom
+        const target = availableTargets.value.find(t => t.id === selectedTarget.value)
+        
+        const response = await apiClient.post(`/tasks/download`, {
+          telescope: selectedTelescope.value,
+          object_name: target.name  // On envoie le nom au lieu de l'ID
         })
         
         emit('download-started', {
           taskId: response.data.task_id,
-          message: `Download started for ${selectedTarget.value}`
+          message: `Téléchargement démarré pour ${target.name}`
         })
         
-        // Commencer à surveiller le statut du téléchargement
         monitorDownload(response.data.task_id)
       } catch (error) {
         console.error('Failed to start download:', error)
-        emit('error', 'Failed to start download')
+        emit('error', 'Échec du démarrage du téléchargement')
+        downloadStatus.value = 'error'
       } finally {
         downloadLoading.value = false
       }
     }
 
+
     const monitorDownload = async (taskId) => {
       const checkStatus = async () => {
         try {
-          const response = await apiClient.get(`/telescopes/tasks/${taskId}`)
+          const response = await apiClient.get(`/tasks/${taskId}`)
+          
           if (response.data.status === 'SUCCESS') {
-            emit('download-complete', response.data.result)
-            return true
+            if (response.data.result.status === 'success') {
+              downloadStatus.value = 'success'
+              emit('download-complete', {
+                files: response.data.result.files,
+                message: response.data.result.message  // On transmet le message de succès
+              })
+              return true
+            } else if (response.data.result.status === 'error') {
+              downloadStatus.value = 'error'
+              emit('error', response.data.result.message)
+              return true
+            }
+          } else if (response.data.status === 'PENDING') {
+            emit('download-progress', 'Téléchargement en cours...')
+          } else if (response.data.status === 'PROGRESS') {
+            emit('download-progress', {
+              status: 'progress',
+              message: response.data.result?.status || 'Téléchargement en cours...'
+            })
           } else if (response.data.status === 'FAILURE') {
-            emit('error', 'Download failed')
+            downloadStatus.value = 'error'
+            emit('error', response.data.result || 'Échec du téléchargement')
             return true
           }
           return false
         } catch (error) {
           console.error('Failed to check status:', error)
+          downloadStatus.value = 'error'
+          emit('error', 'Erreur lors de la vérification du statut')
           return true
         }
       }
@@ -114,6 +143,15 @@ export default {
         const done = await checkStatus()
         if (done) clearInterval(interval)
       }, 2000)
+
+      // Nettoyage après 5 minutes
+      setTimeout(() => {
+        clearInterval(interval)
+        if (downloadStatus.value === 'downloading') {
+          downloadStatus.value = 'error'
+          emit('error', 'Le téléchargement a expiré')
+        }
+      }, 300000)
     }
 
     return {
@@ -123,6 +161,7 @@ export default {
       availableTargets,
       loading,
       downloadLoading,
+      downloadStatus,
       loadTargets,
       downloadFits
     }
