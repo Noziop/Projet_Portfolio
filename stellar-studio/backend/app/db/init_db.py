@@ -1,7 +1,8 @@
 # app/db/init_db.py
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash
-from app.models.user import User, UserLevel
+from app.infrastructure.repositories.models.user import User, UserLevel
+
 
 def init_db(db: Session) -> None:
     user = db.query(User).filter(User.email == "admin@stellarstudio.com").first()

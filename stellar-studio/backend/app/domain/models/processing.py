@@ -1,14 +1,7 @@
-# app/domain/models/processing.py
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
-from enum import Enum
-
-class ProcessingStatus(Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+from ..value_objects.processing_types import ProcessingStatus
 
 @dataclass
 class ProcessingJob:

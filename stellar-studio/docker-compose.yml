@@ -78,7 +78,7 @@ services:
       timeout: 10s
       retries: 3
 
-  celery_worker:
+  celery-download:
     build: 
       context: ./backend
       dockerfile: Dockerfile.celery
@@ -87,6 +87,7 @@ services:
       - ./tmp:/app/tmp
     env_file:
       - .env
+    command: celery -A app.core.celery worker -Q download_queue -n download@%h --loglevel=info
     depends_on:
       redis:
         condition: service_healthy
@@ -98,10 +99,37 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping"]
+      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  celery-processing:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    volumes:
+      - ./backend:/app
+      - ./tmp:/app/tmp
+    env_file:
+      - .env
+    command: celery -A app.core.celery worker -Q processing_queue -n processing@%h --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    deploy:
+      mode: replicated
+      replicas: 4
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
   minio:
     image: minio/minio:latest

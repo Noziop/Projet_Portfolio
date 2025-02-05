@@ -1,5 +1,6 @@
 from typing import List, Optional, Literal, Dict
-from app.models.target import Target, TargetCoordinates
+from app.infrastructure.repositories.models.target import Target, TargetCoordinates
+
 
 class CatalogService:
     # Catalogue prédéfini
