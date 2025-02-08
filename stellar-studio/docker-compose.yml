@@ -6,16 +6,19 @@ services:
       - ./docker/traefik/config:/etc/traefik
       - ./docker/traefik/dynamic:/etc/traefik/dynamic
     ports:
-      - "80:80"
+      - "8085:8085"  # Au lieu de 80:80
       - "8081:8080"
     labels:
       - "traefik.enable=true"
+    networks:
+      - traefik_network
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    user: "65534:65534"
     volumes:
-      - ./docker/prometheus:/etc/prometheus
+      - ./docker/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -24,12 +27,14 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.localhost`)"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.prometheus.entrypoints=web"
     depends_on:
       - backend
     env_file:
       - .env
+    networks:
+      - traefik_network
 
   grafana:
     image: grafana/grafana-oss
@@ -43,23 +48,26 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
     depends_on:
       - prometheus
     env_file:
       - .env
-      
+    networks:
+      - traefik_network
+
   backend:
     build: ./backend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.backend.rule=Host(`api.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
-    user: "1000:1000"
+    user: "1030:100"
     env_file:
       - .env
     depends_on:
@@ -77,16 +85,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - traefik_network
 
-  celery_worker:
-    build: 
+  celery-download:
+    build:
       context: ./backend
       dockerfile: Dockerfile.celery
+    environment:
+      - PYTHONPATH=/app
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
     env_file:
       - .env
+    command: celery -A app.core.celery worker -Q download_queue -n download@%h --loglevel=info
     depends_on:
       redis:
         condition: service_healthy
@@ -98,10 +111,42 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping"]
+      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - traefik_network
+
+  celery-processing:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - ./tmp:/app/tmp
+    env_file:
+      - .env
+    command: celery -A app.core.celery worker -Q processing_queue -n processing@%h --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    deploy:
+      mode: replicated
+      replicas: 4
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - traefik_network
 
   minio:
     image: minio/minio:latest
@@ -117,8 +162,8 @@ services:
       - minio-data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.minio.rule=Host(`minio.localhost`)"
-      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio.rule=Host(`minio.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.minio.entrypoints=web"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -126,12 +171,15 @@ services:
       retries: 5
     env_file:
       - .env
+    networks:
+      - traefik_network
 
   frontend:
     build: ./frontend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+      - "traefik.http.routers.frontend.rule=Host(`stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=8080"
     volumes:
       - ./frontend:/app:delegated
@@ -140,6 +188,8 @@ services:
       - backend
     env_file:
       - .env
+    networks:
+      - traefik_network
 
   database:
     image: mariadb:10.5
@@ -157,9 +207,12 @@ services:
       retries: 5
     env_file:
       - .env
+    networks:
+      - traefik_network
 
   redis:
     image: redis:7-alpine
+    user: "1030:1030"
     volumes:
       - ./data/redis:/data
     command: redis-server --appendonly yes
@@ -170,6 +223,8 @@ services:
       retries: 5
     env_file:
       - .env
+    networks:
+      - traefik_network
 
 volumes:
   grafana-data:
@@ -179,3 +234,7 @@ volumes:
   frontend_node_modules:
   tmp:
     driver: local
+
+networks:
+  traefik_network:
+    driver: bridge

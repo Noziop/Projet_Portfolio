@@ -1,16 +1,6 @@
-# app/domain/models/workflow.py
 from dataclasses import dataclass
 from typing import List, Dict, Any
-from enum import Enum
-
-class ProcessingStepType(Enum):
-    CALIBRATION = "calibration"
-    STACKING = "stacking"
-    STRETCHING = "stretching"
-    COLOR_BALANCE = "color_balance"
-    NOISE_REDUCTION = "noise_reduction"
-    SHARPENING = "sharpening"
-    DECONVOLUTION = "deconvolution"
+from ..value_objects.processing_types import ProcessingStepType
 
 @dataclass
 class ProcessingStep:

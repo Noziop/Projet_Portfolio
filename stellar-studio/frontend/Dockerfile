@@ -2,19 +2,17 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm install --legacy-peer-deps
-
-# Ajouter un utilisateur non-root et donner les permissions
-RUN adduser -D nodeuser && \
-    mkdir -p node_modules/.vite && \
-    chown -R nodeuser:nodeuser /app && \
-    chmod -R 755 node_modules
+# Création utilisateur avec le même UID
+RUN adduser -u 1030 -D nodeuser && \
+    chown -R nodeuser:nodeuser /app
 
 USER nodeuser
 
+# Copie des fichiers avec les bonnes permissions
+COPY --chown=nodeuser:nodeuser package*.json ./
+RUN npm install
+
+# Copie du reste du code
 COPY --chown=nodeuser:nodeuser . .
 
-EXPOSE 8080
-CMD ["npm", "run", "dev", "--", "--port", "8080", "--host"]
+CMD ["npm", "run", "dev", "--", "--port", "8080", "--host", "0.0.0.0"]

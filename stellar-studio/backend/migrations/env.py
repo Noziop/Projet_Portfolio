@@ -34,7 +34,7 @@ except Exception as e:
     print(f"Error importing models: {e}")
 
 def get_url():
-    return "mysql://stellaruser:stellarpassword@database:3306/stellarstudio"
+    return "mysql+mysqlconnector://stellaruser:stellarpassword@database:3306/stellarstudio"
 
 config = context.config
 
