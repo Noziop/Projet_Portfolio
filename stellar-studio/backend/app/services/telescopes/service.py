@@ -1,45 +1,59 @@
-from typing import List, Dict, Optional
-from app.db.session import SessionLocal
-from app.schemas.telescope import TelescopeResponse, TelescopeCreate, TelescopeUpdate
-from .repository import TelescopeRepository
-from ..observation import observation_service
+# app/services/telescopes/service.py
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.repositories.telescope_repository import TelescopeRepository
+from app.schemas.telescope import TelescopeCreate, TelescopeUpdate, TelescopeResponse
+from app.domain.value_objects.telescope_types import TelescopeStatus
 
 class TelescopeService:
-    def get_telescopes(self) -> List[TelescopeResponse]:
-        """Liste tous les télescopes disponibles"""
-        with SessionLocal() as db:
-            repository = TelescopeRepository(db)
-            telescopes = repository.get_all()
-            return [TelescopeResponse.from_orm(t) for t in telescopes]
+    def __init__(self, db_session: AsyncSession):
+        self.db_session = db_session
+        self.repository = TelescopeRepository(db_session)
 
-    def get_telescope(self, telescope_id: str) -> Optional[TelescopeResponse]:
-        """Récupère les détails d'un télescope"""
-        with SessionLocal() as db:
-            repository = TelescopeRepository(db)
-            telescope = repository.get_by_id(telescope_id)
-            return TelescopeResponse.from_orm(telescope) if telescope else None
+    async def get_telescope(self, telescope_id: str) -> TelescopeResponse:
+        telescope = await self.repository.get_by_id(telescope_id)
+        if not telescope:
+            raise ValueError(f"Télescope avec l'id {telescope_id} introuvable")
+        return TelescopeResponse.model_validate(telescope)
 
-    async def get_telescope_observations(self, telescope_id: str, target_name: str):
-        """Récupère les observations d'un télescope pour une cible donnée"""
-        return await observation_service.get_telescope_observations(telescope_id, target_name)
+    async def list_telescopes(self):
+        telescopes = await self.repository.list()
+        return [TelescopeResponse.model_validate(t) for t in telescopes]
 
-    # Méthodes CRUD pour l'admin
-    def create_telescope(self, telescope_data: TelescopeCreate) -> TelescopeResponse:
-        """Crée un nouveau télescope (admin only)"""
-        with SessionLocal() as db:
-            repository = TelescopeRepository(db)
-            telescope = repository.create(telescope_data.model_dump())
-            return TelescopeResponse.from_orm(telescope)
+    async def create_telescope(self, telescope_data: TelescopeCreate) -> TelescopeResponse:
+        telescope = await self.repository.create(telescope_data.model_dump())
+        return TelescopeResponse.model_validate(telescope)
 
-    def update_telescope(self, telescope_id: str, telescope_data: TelescopeUpdate) -> Optional[TelescopeResponse]:
-        """Met à jour un télescope existant (admin only)"""
-        with SessionLocal() as db:
-            repository = TelescopeRepository(db)
-            telescope = repository.update(telescope_id, telescope_data.model_dump(exclude_unset=True))
-            return TelescopeResponse.from_orm(telescope) if telescope else None
+    async def update_telescope(self, telescope_id: str, telescope_data: TelescopeUpdate) -> TelescopeResponse:
+        telescope = await self.repository.get_by_id(telescope_id)
+        if not telescope:
+            raise ValueError(f"Télescope avec l'id {telescope_id} introuvable")
+        updated_telescope = await self.repository.update(telescope_data.model_dump(exclude_unset=True))
+        return TelescopeResponse.model_validate(updated_telescope)
 
-    def delete_telescope(self, telescope_id: str) -> bool:
-        """Supprime un télescope (admin only)"""
-        with SessionLocal() as db:
-            repository = TelescopeRepository(db)
-            return repository.delete(telescope_id)
+    async def delete_telescope(self, telescope_id: str) -> bool:
+        telescope = await self.repository.get_by_id(telescope_id)
+        if not telescope:
+            raise ValueError(f"Télescope avec l'id {telescope_id} introuvable")
+        return await self.repository.delete(telescope_id)
+
+    async def change_telescope_status(self, telescope_id: str, status: TelescopeStatus) -> TelescopeResponse:
+        """Change le statut d'un télescope"""
+        telescope = await self.repository.get_by_id(telescope_id)
+        if not telescope:
+            raise ValueError(f"Télescope avec l'id {telescope_id} introuvable")
+        
+        update_data = TelescopeUpdate(status=status)
+        updated_telescope = await self.repository.update(telescope_id, update_data.model_dump(exclude_unset=True))
+        return TelescopeResponse.model_validate(updated_telescope)
+
+    async def activate_telescope(self, telescope_id: str) -> TelescopeResponse:
+        """Active un télescope"""
+        return await self.change_telescope_status(telescope_id, TelescopeStatus.ACTIVE)
+
+    async def deactivate_telescope(self, telescope_id: str) -> TelescopeResponse:
+        """Désactive un télescope"""
+        return await self.change_telescope_status(telescope_id, TelescopeStatus.OFFLINE)
+
+    async def set_maintenance_mode(self, telescope_id: str) -> TelescopeResponse:
+        """Met un télescope en maintenance"""
+        return await self.change_telescope_status(telescope_id, TelescopeStatus.MAINTENANCE)

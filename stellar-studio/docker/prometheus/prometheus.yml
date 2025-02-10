@@ -8,15 +8,27 @@ scrape_configs:
       - targets: ['backend:8000']
     metrics_path: '/metrics'
 
+  - job_name: 'celery'
+    static_configs:
+      - targets: ['celery-exporter:9540']
+
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
 
-  - job_name: 'mysql'
+  - job_name: minio-job
+    bearer_token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwcm9tZXRoZXVzIiwic3ViIjoibWluaW9hZG1pbiIsImV4cCI6NDg5MjYzMzc0OH0.FTO3O8p_O38YCzDHl2idqFzh1Tzep_Kjc60qBk5oIUvOTHGNX8Ef0jPO7XUXDV3Oi4IXTetYFMroKMllC1psmQ
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
     static_configs:
-      - targets: ['mysqld-exporter:9104']
+    - targets: ['minio:9000']
 
-  - job_name: 'minio'
-    metrics_path: '/minio/v2/metrics/cluster'
+  - job_name: 'traefik'
+    scrape_interval: 10s
     static_configs:
-      - targets: ['minio.stellarstudio.fassih.ch:9000']
+      - targets: ['traefik:8082']
+    metrics_path: '/metrics'
+
+  - job_name: 'mariadb'
+    static_configs:
+      - targets: ['mariadb-exporter:9104']

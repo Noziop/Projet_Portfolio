@@ -1,130 +1,99 @@
-# app/services/auth/service.py
-from typing import List, Optional
+# services/auth/service.py
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
-from app.schemas.user import UserCreate, User, Token, UserUpdate
-from app.infrastructure.repositories.models.user import User as UserModel
-from .password import PasswordManager
-from .session import SessionHandler
+from typing import Optional
+from app.core.security import verify_password, get_password_hash
+from app.services.user.service import UserService
+from app.services.session.service import SessionService
+from app.schemas.user import UserCreate, User
+from app.schemas.auth import Token
+from app.domain.value_objects.user_types import UserRole
 
 class AuthService:
-    def __init__(self):
-        self.session_handler = SessionHandler()
-        self.password_manager = PasswordManager(self.session_handler)
+    def __init__(self, user_service: UserService, session_service: SessionService):
+        self.user_service = user_service
+        self.session_service = session_service
 
-    async def register_new_user(self, user_data: UserCreate) -> User:
-        with SessionLocal() as db:
-            if self._get_user_by_email(db, user_data.email):
-                raise ValueError("Email already registered")
-            
-            if self._get_user_by_username(db, user_data.username):
-                raise ValueError("Username already taken")
-            
-            return self._create_user(db, user_data)
+    async def register(self, user_data: UserCreate) -> User:
+        """Enregistre un nouvel utilisateur"""
+        # Vérification du mot de passe
+        if len(user_data.password) < 12:
+            raise ValueError("Password must be at least 12 characters long")
+
+        hashed_password = get_password_hash(user_data.password)
+        return await self.user_service.create_user(user_data, hashed_password)
 
     async def authenticate(self, email: str, password: str) -> Token:
-        with SessionLocal() as db:
-            user = self._get_user_by_email(db, email)
-            if not user or not self.password_manager.verify_password(password, user.hashed_password):
-                raise ValueError("Invalid email or password")
-            
-            if not user.is_active:
-                raise ValueError("User account is disabled")
+        """Authentifie un utilisateur et crée une session"""
+        user = await self.user_service.get_by_email(email.lower())
+        if not user:
+            # Message volontairement vague pour la sécurité
+            raise ValueError("Invalid credentials")
 
-            return self.session_handler.create_session(db, user)
+        if not verify_password(password, user.hashed_password):
+            # Log tentative échouée ici
+            raise ValueError("Invalid credentials")
+
+        if not user.is_active:
+            raise ValueError("Account is disabled")
+
+        # Mise à jour du last_login
+        user.last_login = datetime.now(timezone.utc)
+        await self.user_service.update_user(user.id, {"last_login": user.last_login})
+
+        # Création de la session
+        return await self.session_service.create_session(user)
 
     async def logout(self, user_id: str) -> bool:
-        return self.session_handler.revoke_session(user_id)
+        """Déconnecte un utilisateur en révoquant sa session"""
+        return await self.session_service.revoke_session(user_id)
 
-    async def validate_token(self, user_id: str) -> bool:
-        return self.session_handler.validate_session(user_id)
+    async def change_password(self, user_id: str, old_password: str, new_password: str) -> bool:
+        """Change le mot de passe d'un utilisateur"""
+        user = await self.user_service.get_user(user_id)
+        if not user:
+            raise ValueError("User not found")
 
-    def _get_user_by_email(self, db: Session, email: str) -> Optional[UserModel]:
-        return db.query(UserModel).filter(UserModel.email == email).first()
+        if not verify_password(old_password, user.hashed_password):
+            # Log tentative échouée ici
+            raise ValueError("Current password is incorrect")
 
-    def _get_user_by_username(self, db: Session, username: str) -> Optional[UserModel]:
-        return db.query(UserModel).filter(UserModel.username == username).first()
+        if len(new_password) < 12:
+            raise ValueError("New password must be at least 12 characters long")
 
-    def _create_user(self, db: Session, user_data: UserCreate) -> User:
-        db_user = UserModel(
-            email=user_data.email,
-            username=user_data.username,
-            hashed_password=self.password_manager.hash_password(user_data.password),
-            firstname=user_data.firstname,
-            lastname=user_data.lastname,
-            level=user_data.level,
-            is_active=True,
-            created_at=datetime.now(timezone.utc)
-        )
+        if old_password == new_password:
+            raise ValueError("New password must be different from current password")
+
+        hashed_password = get_password_hash(new_password)
+        success = await self.user_service.update_password(user_id, hashed_password)
         
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        if success:
+            # Révoque toutes les sessions existantes
+            await self.session_service.revoke_session(user_id)
         
-        return User.from_orm(db_user)
+        return success
 
-    async def deactivate_account(self, user_id: str) -> bool:
-        with SessionLocal() as db:
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()
-            if not user:
-                raise ValueError("User not found")
-            
-            user.is_active = False
-            db.commit()
-            
-            await self.session_handler.revoke_session(user_id)
+    async def reset_password_request(self, email: str) -> bool:
+        """Initie une demande de réinitialisation de mot de passe"""
+        user = await self.user_service.get_by_email(email.lower())
+        if not user or not user.is_active:
+            # Toujours retourner True même si l'utilisateur n'existe pas (sécurité)
             return True
 
-    async def list_all_users(self) -> List[User]:
-        """Liste tous les utilisateurs (admin only)"""
-        with SessionLocal() as db:
-            users = db.query(UserModel).all()
-            return [User.from_orm(user) for user in users]
+        # TODO: Implémenter l'envoi d'email avec token de réinitialisation
+        return True
 
-    async def get_user_by_id(self, user_id: str) -> Optional[User]:
-        """Récupère un utilisateur par son ID"""
-        with SessionLocal() as db:
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()
-            if not user:
-                return None
-            return User.from_orm(user)
+    async def validate_session(self, user_id: str) -> bool:
+        """Vérifie si la session de l'utilisateur est valide"""
+        return await self.session_service.validate_session(user_id)
 
-    async def update_user(self, user_id: str, user_update: UserUpdate) -> User:
-        """Met à jour les informations d'un utilisateur"""
-        with SessionLocal() as db:
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()
-            if not user:
-                raise ValueError("User not found")
+    async def check_permissions(self, user_id: str, required_role: UserRole) -> bool:
+        """Vérifie si l'utilisateur a les permissions requises"""
+        user = await self.user_service.get_user(user_id)
+        if not user or not user.is_active:
+            return False
 
-            # Vérification de l'unicité de l'email et du username si modifiés
-            if user_update.email and user_update.email != user.email:
-                if self._get_user_by_email(db, user_update.email):
-                    raise ValueError("Email already registered")
-                
-            if user_update.username and user_update.username != user.username:
-                if self._get_user_by_username(db, user_update.username):
-                    raise ValueError("Username already taken")
-
-            # Mise à jour des champs
-            update_data = user_update.model_dump(exclude_unset=True)
-            for key, value in update_data.items():
-                setattr(user, key, value)
-
-            db.commit()
-            db.refresh(user)
-            return User.from_orm(user)
-
-    async def delete_user(self, user_id: str) -> bool:
-        """Supprime un utilisateur"""
-        with SessionLocal() as db:
-            user = db.query(UserModel).filter(UserModel.id == user_id).first()
-            if not user:
-                raise ValueError("User not found")
-
-            # Révocation de la session avant suppression
-            await self.session_handler.revoke_session(user_id)
-            
-            db.delete(user)
-            db.commit()
+        # Admin a tous les droits
+        if user.role == UserRole.ADMIN:
             return True
+
+        return user.role == required_role

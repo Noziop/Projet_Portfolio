@@ -1,6 +1,13 @@
 services:
   traefik:
     image: traefik:v2.5
+    command:
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--entryPoints.metrics.address=:8082"
+      - "--metrics.prometheus.entryPoint=metrics"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./docker/traefik/config:/etc/traefik
@@ -25,6 +32,9 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    environment:
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.stellarstudio.fassih.ch`)"
@@ -89,11 +99,13 @@ services:
       - traefik_network
 
   celery-download:
+    hostname: "celery-download-${CELERY_WORKER_ID:-1}"
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
       - PYTHONPATH=/app
+      - CELERY_WORKER_NAME=download-%(n)d
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
@@ -111,19 +123,22 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
+      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping -d download@$$HOSTNAME"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 5s
     networks:
       - traefik_network
 
   celery-processing:
+    hostname: "celery-processing-${CELERY_WORKER_ID:-1}"
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
       - PYTHONPATH=/app
+      - CELERY_WORKER_NAME=processing-%(n)d
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
@@ -141,10 +156,26 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD", "celery", "-A", "app.core.celery", "inspect", "ping", "-d", "celery@%h"]
+      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping -d processing@$$HOSTNAME"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 5s
+    networks:
+      - traefik_network
+
+  celery-exporter:
+    image: grafana/celery-exporter
+    command: >
+      --broker-url=redis://redis:6379/0
+      --queue-labels=download_queue:type=download,processing_queue:type=processing
+      --task-labels=app.tasks.download:type=download,app.tasks.processing:type=processing
+    environment:
+      - TZ=Europe/Paris
+      - CE_BROKER_URL=redis://redis:6379/0
+      - CE_BUCKETS=1,2.5,5,10,30,60,300,600,900,1800
+      - CELERY_QUEUE_NAME_MAPPING=download_queue:download,processing_queue:processing
+      - CELERY_WORKER_NAME_MAPPING=celery-download:download,celery-
     networks:
       - traefik_network
 
@@ -158,12 +189,14 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
+      MINIO_BROWSER: "off"
     volumes:
       - minio-data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.minio.rule=Host(`minio.stellarstudio.fassih.ch`)"
-      - "traefik.http.routers.minio.entrypoints=web"
+      # API S3
+      - "traefik.http.routers.minio-api.rule=Host(`minio.stellarstudio.fassih.ch`) && PathPrefix(`/api`)"
+      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -210,6 +243,27 @@ services:
     networks:
       - traefik_network
 
+  mariadb-exporter:
+    image: prom/mysqld-exporter
+    user: "1030:100"
+    volumes:
+      - ${PWD}/config.my-cnf:/etc/mysqld_exporter/config.my-cnf
+    command:
+      - --config.my-cnf=/etc/mysqld_exporter/config.my-cnf
+      - --collect.info_schema.tables
+      - --collect.info_schema.innodb_metrics
+      - --collect.global_status
+      - --collect.global_variables
+      - --collect.slave_status
+      - --collect.info_schema.processlist
+    env_file:
+      - .env
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - traefik_network
+
   redis:
     image: redis:7-alpine
     user: "1030:1030"
@@ -223,6 +277,12 @@ services:
       retries: 5
     env_file:
       - .env
+    networks:
+      - traefik_network
+
+  redis-exporter:
+    image: oliver006/redis_exporter
+    command: --redis.addr=redis://redis:6379
     networks:
       - traefik_network
 

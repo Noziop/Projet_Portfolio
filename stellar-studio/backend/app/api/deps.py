@@ -1,28 +1,28 @@
 # app/api/deps.py
-from typing import Generator
+from typing import AsyncGenerator, Callable
 from functools import wraps
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.config import settings
 from app.core.session import SessionManager
-from app.db.session import SessionLocal
-from app.domain.models.user import User, UserRole  # Pour le typage et les rôles
-from app.infrastructure.repositories.models.user import User as UserModel  # Pour SQLAlchemy
+from app.db.session import AsyncSessionLocal
+from app.domain.models.user import User, UserRole
+from app.infrastructure.repositories.models.user import User as UserModel
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 session_manager = SessionManager()
 
-def get_db() -> Generator:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 def convert_to_domain_user(db_user: UserModel) -> User:
-    """Convertit un modèle SQLAlchemy en modèle de domaine"""
     return User(
         id=db_user.id,
         email=db_user.email,
@@ -37,7 +37,7 @@ def convert_to_domain_user(db_user: UserModel) -> User:
     )
 
 async def get_current_user(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     token: str = Depends(oauth2_scheme)
 ) -> User:
     credentials_exception = HTTPException(
@@ -56,24 +56,32 @@ async def get_current_user(
         raise credentials_exception
 
     # Vérification session Redis
-    session = session_manager.get_session(user_id)
+    session = await session_manager.get_session(user_id)
     if not session:
         raise credentials_exception
 
-    db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    # Utilisation de select() avec async
+    query = select(UserModel).where(UserModel.id == user_id)
+    result = await db.execute(query)
+    db_user = result.scalar_one_or_none()
+    
     if db_user is None:
         raise credentials_exception
         
     return convert_to_domain_user(db_user)
 
 def require_role(*roles: UserRole):
-    def decorator(func):
+    """
+    Décorateur pour vérifier les rôles utilisateur.
+    Utilise get_current_user en interne.
+    """
+    def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, current_user: User = Depends(get_current_user), **kwargs):
             if current_user.role not in roles:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Permission denied",
+                    detail="Permission insuffisante pour cette opération"
                 )
             return await func(*args, current_user=current_user, **kwargs)
         return wrapper

@@ -1,24 +1,17 @@
 # app/infrastructure/repositories/telescope_repository.py
-from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from typing import Optional, List
 
 from .base_repository import BaseRepository
 from ..repositories.models.telescope import SpaceTelescope as TelescopeModel
 from app.domain.models.telescope import Telescope
 
 class TelescopeRepository(BaseRepository[Telescope]):
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
 
-    async def get_by_id(self, id: str) -> Optional[Telescope]:
-        query = select(TelescopeModel).where(TelescopeModel.id == id)
-        result = await self.db_session.execute(query)
-        db_telescope = result.scalar_one_or_none()
-        
-        if db_telescope is None:
-            return None
-            
+    def _to_domain(self, db_telescope: TelescopeModel) -> Telescope:
         return Telescope(
             id=db_telescope.id,
             name=db_telescope.name,
@@ -27,11 +20,18 @@ class TelescopeRepository(BaseRepository[Telescope]):
             focal_length=db_telescope.focal_length,
             location=db_telescope.location,
             instruments=db_telescope.instruments,
-            api_endpoint=db_telescope.api_endpoint
+            api_endpoint=db_telescope.api_endpoint,
+            status=db_telescope.status
         )
 
     async def get_by_name(self, name: str) -> Optional[Telescope]:
         query = select(TelescopeModel).where(TelescopeModel.name == name)
+        result = await self.db_session.execute(query)
+        db_telescope = result.scalar_one_or_none()
+        return self._to_domain(db_telescope) if db_telescope else None
+
+    async def get_by_id(self, id: str) -> Optional[Telescope]:
+        query = select(TelescopeModel).where(TelescopeModel.id == id)
         result = await self.db_session.execute(query)
         db_telescope = result.scalar_one_or_none()
         

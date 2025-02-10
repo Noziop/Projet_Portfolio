@@ -1,78 +1,90 @@
-from typing import Optional, Dict, Any, List
-from astroquery.mast import Observations
-from astroquery.simbad import Simbad
-import logging
-from app.db.session import SessionLocal
-from app.infrastructure.repositories.models.target import Target
+# app/services/observation/service.py
+from typing import Optional, List, Dict, Any
+from uuid import uuid4
+from datetime import datetime
+from fastapi import Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.session import AsyncSessionLocal
+from app.infrastructure.repositories.observation_repository import ObservationRepository
+from app.domain.models.observation import Observation
+from app.domain.value_objects.coordinates import Coordinates
+from app.domain.value_objects.observation_types import InstrumentType, FilterType
 
 class ObservationService:
-    def get_target_preview(self, object_name: str, telescope: str) -> Optional[str]:
-        """Récupère l'URL de preview pour un objet et un télescope donnés"""
-        try:
-            obs_table = Observations.query_object(object_name, radius=0.2)
-            if len(obs_table) == 0:
-                logging.warning(f"No observations found for {object_name}")
-                return None
-                
-            obs_filtered = obs_table[obs_table['obs_collection'] == telescope]
-            if len(obs_filtered) == 0:
-                logging.warning(f"No {telescope} observations found for {object_name}")
-                return None
-                
-            products = Observations.get_product_list(obs_filtered[0:1])
-            preview_products = Observations.filter_products(
-                products,
-                productType=["PREVIEW"],
-                extension="jpg"
-            )
-            
-            if len(preview_products) > 0:
-                preview_url = preview_products[0].get('dataURL')
-                if not preview_url:
-                    logging.warning(f"No preview URL for {object_name}")
-                    return None
-                return preview_url
-                
-            return None
-        except Exception as e:
-            logging.error(f"Preview error for {object_name}: {str(e)}")
-            return None
+    def __init__(self, session: AsyncSession = Depends(AsyncSessionLocal)):
+        self.repository = ObservationRepository(session)
 
-    def get_available_targets(self, telescope: str) -> List[Dict]:
-        """Retourne la liste des cibles pour un télescope depuis la DB"""
-        with SessionLocal() as db:
-            targets = db.query(Target).filter(Target.telescope_id == telescope).all()
-            return [target.to_dict() for target in targets]
+    async def create_observation(
+        self,
+        telescope_id: str,
+        target_id: str,
+        coordinates: Dict[str, str],
+        start_time: datetime,
+        exposure_time: int,
+        instrument: InstrumentType,
+        filters: List[FilterType],
+        fits_files: List[str]
+    ) -> Observation:
+        observation = Observation(
+            id=str(uuid4()),
+            telescope_id=telescope_id,
+            target_id=target_id,
+            coordinates=Coordinates(
+                ra=coordinates['ra'],
+                dec=coordinates['dec']
+            ),
+            start_time=start_time,
+            exposure_time=exposure_time,
+            instrument=instrument,
+            filters=filters,
+            fits_files=fits_files
+        )
+        return await self.repository.create(observation)
 
-    async def fetch_object_data(self, object_name: str) -> Dict[str, Any]:
-        """Récupère les données Simbad pour un objet"""
-        try:
-            result = Simbad.query_object(object_name)
-            return {
-                "status": "success",
-                "data": {name: str(result[0][name]) for name in result.colnames}
-            }
-        except Exception as e:
-            logging.error(f"Simbad error: {str(e)}")
-            return {"status": "error", "message": str(e)}
+    async def get_observation(self, observation_id: str) -> Optional[Observation]:
+        observation = await self.repository.get_by_id(observation_id)
+        if not observation:
+            raise HTTPException(status_code=404, detail="Observation non trouvée")
+        return observation
 
-    async def get_telescope_observations(self, telescope_id: str, target_name: str) -> Dict[str, Any]:
-        """Récupère les observations d'un télescope pour une cible donnée"""
-        try:
-            obs_table = Observations.query_object(target_name, radius=".02 deg")
-            obs_filtered = obs_table[obs_table['obs_collection'] == telescope_id]
-            
-            if len(obs_filtered) == 0:
-                return {
-                    "status": "error",
-                    "message": f"No {telescope_id} observations found for {target_name}"
-                }
+    async def list_telescope_observations(self, telescope_id: str) -> List[Observation]:
+        return await self.repository.list_by_telescope(telescope_id)
 
-            return {
-                "status": "success",
-                "count": len(obs_filtered),
-                "observations": obs_filtered.to_table().to_pandas().to_dict('records')
-            }
-        except Exception as e:
-            logging.error(f"Error fetching observations: {str(e)}")
-            return {"status": "error", "message": str(e)}
+    async def update_observation(
+        self,
+        observation_id: str,
+        telescope_id: Optional[str] = None,
+        target_id: Optional[str] = None,
+        coordinates: Optional[Dict[str, str]] = None,
+        start_time: Optional[datetime] = None,
+        exposure_time: Optional[int] = None,
+        instrument: Optional[InstrumentType] = None,
+        filters: Optional[List[FilterType]] = None,
+        preview_url: Optional[str] = None
+    ) -> Observation:
+        current_observation = await self.get_observation(observation_id)
+        if not current_observation:
+            raise HTTPException(status_code=404, detail="Observation non trouvée")
+
+        # Mise à jour uniquement des champs fournis
+        updated_observation = Observation(
+            id=observation_id,
+            telescope_id=telescope_id or current_observation.telescope_id,
+            target_id=target_id or current_observation.target_id,
+            coordinates=Coordinates(**coordinates) if coordinates else current_observation.coordinates,
+            start_time=start_time or current_observation.start_time,
+            exposure_time=exposure_time or current_observation.exposure_time,
+            instrument=instrument or current_observation.instrument,
+            filters=filters or current_observation.filters,
+            fits_files=current_observation.fits_files,
+            preview_url=preview_url if preview_url is not None else current_observation.preview_url
+        )
+
+        return await self.repository.update(updated_observation)
+
+    async def delete_observation(self, observation_id: str) -> bool:
+        deleted = await self.repository.delete(observation_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Observation non trouvée")
+        return True
+

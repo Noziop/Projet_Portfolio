@@ -1,22 +1,11 @@
-# app/infrastructure/repositories/models/user.py
 from sqlalchemy import Column, String, Boolean, DateTime, Enum
 from sqlalchemy.sql import func
-import enum
 import uuid
 from sqlalchemy.dialects.mysql import CHAR
 from app.db.base_class import Base
+from app.domain.value_objects.user_types import UserLevel, UserRole
 
-class UserLevel(enum.Enum):
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
-
-class UserRole(enum.Enum):
-    ADMIN = "admin"
-    OPERATOR = "operator"
-    USER = "user"
-
-def generate_uuid():
+def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 class User(Base):
@@ -28,8 +17,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     firstname = Column(String(100), nullable=True)
     lastname = Column(String(100), nullable=True)
-    level = Column(Enum(UserLevel), nullable=False, default=UserLevel.BEGINNER)  
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
+    level = Column(Enum(UserLevel), nullable=False, default=UserLevel.get_default)  
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.get_default)
     created_at = Column(DateTime, server_default=func.now())
     last_login = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)

@@ -1,2 +1,6 @@
 *.tmp
 get-pip.py
+backup/
+*eaDir/
+*Zone.Identifier
+Stage*/

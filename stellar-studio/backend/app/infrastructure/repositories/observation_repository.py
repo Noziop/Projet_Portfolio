@@ -1,15 +1,16 @@
 # app/infrastructure/repositories/observation_repository.py
 from typing import Optional, List
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .base_repository import BaseRepository
 from ..repositories.models.observation import Observation as ObservationModel
 from app.domain.models.observation import Observation
 from app.domain.value_objects.coordinates import Coordinates
+from app.domain.value_objects.observation_types import FilterType
 
 class ObservationRepository(BaseRepository[Observation]):
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
 
     async def get_by_id(self, id: str) -> Optional[Observation]:
@@ -30,8 +31,8 @@ class ObservationRepository(BaseRepository[Observation]):
             ),
             start_time=db_observation.start_time,
             exposure_time=db_observation.exposure_time,
-            instrument=db_observation.instrument,
-            filters=db_observation.filters,
+            instrument=db_observation.instrument,  # Déjà un enum grâce à SQLAlchemy
+            filters=[FilterType(f) for f in db_observation.filters],  # Conversion de JSON en enums
             fits_files=db_observation.fits_files,
             preview_url=db_observation.preview_url
         )
@@ -53,7 +54,7 @@ class ObservationRepository(BaseRepository[Observation]):
                 start_time=db_observation.start_time,
                 exposure_time=db_observation.exposure_time,
                 instrument=db_observation.instrument,
-                filters=db_observation.filters,
+                filters=[FilterType(f) for f in db_observation.filters],
                 fits_files=db_observation.fits_files,
                 preview_url=db_observation.preview_url
             )
@@ -70,7 +71,7 @@ class ObservationRepository(BaseRepository[Observation]):
             start_time=observation.start_time,
             exposure_time=observation.exposure_time,
             instrument=observation.instrument,
-            filters=observation.filters,
+            filters=[f.value for f in observation.filters],  # Conversion des enums en JSON
             fits_files=observation.fits_files,
             preview_url=observation.preview_url
         )
@@ -96,7 +97,7 @@ class ObservationRepository(BaseRepository[Observation]):
         db_observation.start_time = observation.start_time
         db_observation.exposure_time = observation.exposure_time
         db_observation.instrument = observation.instrument
-        db_observation.filters = observation.filters
+        db_observation.filters = [f.value for f in observation.filters]
         db_observation.fits_files = observation.fits_files
         db_observation.preview_url = observation.preview_url
         
