@@ -29,6 +29,9 @@ python-dotenv = "^1.0.0"
 kombu = "^5.3.5"
 aiomysql = "^0.2.0"
 mysql-connector-python = "^8.0.0"
+websockets = "^11.0.0"  # Pour le support WebSocket
+aioredis = "^2.0.0"    # Pour la gestion des connexions WebSocket via Redis
+Pillow = "^10.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
