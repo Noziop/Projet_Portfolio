@@ -1,19 +1,15 @@
 # app/domain/models/observation.py
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
-from ..value_objects.coordinates import Coordinates
-from ..value_objects.observation_types import InstrumentType, FilterType
+from typing import Optional
+from uuid import UUID
 
 @dataclass
 class Observation:
-    id: str
-    telescope_id: str
-    target_id: str
-    coordinates: Coordinates
-    start_time: datetime
-    exposure_time: int
-    instrument: InstrumentType
-    filters: List[FilterType]
-    fits_files: List[str]
-    preview_url: Optional[str] = None
+    id: UUID
+    target_id: UUID
+    telescope_id: UUID
+    observation_date: datetime
+    exposure_time: float
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

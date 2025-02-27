@@ -2,21 +2,11 @@
 from enum import Enum
 
 class UserLevel(str, Enum):
-    BEGINNER = "beginner"
-    INTERMEDIATE = "intermediate"
-    ADVANCED = "advanced"
-
-    @classmethod
-    def get_default(cls) -> "UserLevel":
-        """Retourne la valeur par défaut du niveau utilisateur"""
-        return cls.BEGINNER
+    BEGINNER = "BEGINNER"
+    INTERMEDIATE = "INTERMEDIATE"
+    ADVANCED = "ADVANCED"
 
 class UserRole(str, Enum):
-    ADMIN = "admin"
-    OPERATOR = "operator"
-    USER = "user"
-
-    @classmethod
-    def get_default(cls) -> "UserRole":
-        """Retourne la valeur par défaut du rôle utilisateur"""
-        return cls.USER
+    ADMIN = "ADMIN"
+    OPERATOR = "OPERATOR"
+    USER = "USER"

@@ -1,17 +1,19 @@
-# domain/models/task.py
+# app/domain/models/task.py
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Dict, Any
-from ..value_objects.task_types import TaskStatus, TaskType
+from typing import Optional, Dict
+from uuid import UUID
+from app.domain.value_objects.task_types import TaskType, TaskStatus
 
 @dataclass
 class Task:
-    id: str
-    user_id: str
+    id: UUID
     type: TaskType
     status: TaskStatus
-    parameters: Dict[str, Any]
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    result: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
+    params: Dict
+    user_id: Optional[UUID] = None
+    result: Optional[Dict] = None
+    error: Optional[str] = None
+    progress: Optional[float] = None  # Progression 0-100
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None

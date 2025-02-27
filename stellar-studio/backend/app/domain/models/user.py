@@ -1,17 +1,20 @@
+# app/domain/models/user.py
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
-from ..value_objects.user_types import UserLevel, UserRole
+from uuid import UUID
+from app.domain.value_objects.user_types import UserLevel, UserRole
 
 @dataclass
 class User:
-    id: str
+    id: UUID
     email: str
     username: str
-    firstname: Optional[str]
-    lastname: Optional[str]
-    role: UserRole
+    hashed_password: str
     level: UserLevel
-    created_at: datetime
-    last_login: Optional[datetime]
-    is_active: bool
+    role: UserRole
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+    is_active: bool = True

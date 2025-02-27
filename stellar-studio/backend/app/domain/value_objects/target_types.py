@@ -1,4 +1,4 @@
-# app/domain/value_objects/target_types.py
+#app/domain/value_objects/target_types.py
 from enum import Enum
 
 class ObjectType(str, Enum):
@@ -6,3 +6,8 @@ class ObjectType(str, Enum):
     GALAXY = "galaxy"
     STAR_CLUSTER = "star_cluster"
     PLANETARY_NEBULA = "planetary_nebula"
+
+class TargetStatus(str, Enum):
+    READY = "ready"
+    NEEDS_DOWNLOAD = "needs_download"
+    PROCESSING = "processing"

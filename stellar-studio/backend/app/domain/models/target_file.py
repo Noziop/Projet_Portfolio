@@ -1,16 +1,19 @@
-# domain/models/target_file.py
+# app/domain/models/target_file.py
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict
+from uuid import UUID
 
 @dataclass
 class TargetFile:
-    id: str
-    target_id: str
-    filter_id: str
+    id: UUID
+    target_id: UUID
+    filter_id: UUID
     file_path: str
-    file_size: Optional[int]
-    in_minio: bool
-    fits_metadata: Optional[Dict]
-    created_at: datetime
-    updated_at: datetime
+    mast_id: str
+    file_size: Optional[int] = None
+    is_downloaded: bool = False
+    in_minio: bool = False
+    fits_metadata: Optional[Dict] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
