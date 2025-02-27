@@ -1,49 +1,52 @@
 # app/schemas/observation.py
-from pydantic import BaseModel, Field
-from typing import List, Optional
 from datetime import datetime
-from app.domain.value_objects.observation_types import InstrumentType, FilterType
-from app.domain.value_objects.coordinates import Coordinates
-
-class CoordinatesSchema(BaseModel):
-    ra: str = Field(..., description="Ascension droite")
-    dec: str = Field(..., description="Déclinaison")
-    
-    model_config = {
-        "from_attributes": True
-    }
+from typing import Optional
+from uuid import UUID
+from pydantic import BaseModel, Field, validator
 
 class ObservationBase(BaseModel):
-    telescope_id: str = Field(..., description="Identifiant du télescope")
-    target_id: str = Field(..., description="Identifiant de la cible")
-    coordinates: CoordinatesSchema
-    start_time: datetime = Field(..., description="Date et heure de début de l'observation")
-    exposure_time: int = Field(..., description="Temps d'exposition en secondes")
-    instrument: InstrumentType
-    filters: List[FilterType]
-
-    model_config = {
-        "from_attributes": True
-    }
+    """Attributs communs pour tous les schemas Observation"""
+    observation_date: datetime = Field(..., description="Date de l'observation")
+    exposure_time: float = Field(
+        ..., 
+        description="Temps d'exposition en secondes",
+        gt=0  # Doit être positif
+    )
 
 class ObservationCreate(ObservationBase):
-    fits_files: List[str] = Field(default_factory=list, description="Liste des fichiers FITS")
+    """Schema pour la création d'une observation"""
+    target_id: UUID = Field(..., description="ID de la cible observée")
+    telescope_id: UUID = Field(..., description="ID du télescope utilisé")
+
+    @validator('exposure_time')
+    def validate_exposure_time(cls, v):
+        if v <= 0:
+            raise ValueError("Le temps d'exposition doit être positif")
+        return v
 
 class ObservationUpdate(BaseModel):
-    telescope_id: Optional[str] = None
-    target_id: Optional[str] = None
-    coordinates: Optional[CoordinatesSchema] = None
-    start_time: Optional[datetime] = None
-    exposure_time: Optional[int] = None
-    instrument: Optional[InstrumentType] = None
-    filters: Optional[List[FilterType]] = None
-    preview_url: Optional[str] = None
+    """Schema pour la mise à jour d'une observation"""
+    observation_date: Optional[datetime] = None
+    exposure_time: Optional[float] = None
 
-    model_config = {
-        "from_attributes": True
-    }
+    @validator('exposure_time')
+    def validate_exposure_time(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Le temps d'exposition doit être positif")
+        return v
 
 class ObservationInDB(ObservationBase):
-    id: str
-    fits_files: List[str]
-    preview_url: Optional[str] = None
+    """Schema pour une observation en DB"""
+    id: UUID
+    target_id: UUID
+    telescope_id: UUID
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class ObservationResponse(ObservationInDB):
+    """Schema pour la réponse API"""
+    target_name: Optional[str] = Field(None, description="Nom de la cible observée")
+    telescope_name: Optional[str] = Field(None, description="Nom du télescope utilisé")

@@ -1,89 +1,127 @@
-# api/v1/endpoints/auth.py
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+# app/api/v1/endpoints/auth.py
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.schemas.user import UserCreate, User, PasswordChange
-from app.schemas.auth import Token
-from app.api.deps import get_current_user
-from app.services.auth import get_auth_service
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
+import json
+
+from app.api.deps import get_db, get_current_user, get_session_service
+from app.core.config import settings
+from app.schemas.user import UserCreate, UserResponse
+from app.schemas.auth import PasswordChange
 from app.services.auth.service import AuthService
+from app.services.auth.session import SessionService
+from app.services.user.service import UserService
 
-router = APIRouter(tags=["Authentication"])
+router = APIRouter()
 
-@router.post("/register", 
-    response_model=User,
-    status_code=status.HTTP_201_CREATED,
-    description="Register a new user")
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(
-    user_in: UserCreate,
-    auth_service: AuthService = Depends(get_auth_service)
+    user_data: UserCreate,
+    db: AsyncSession = Depends(get_db),
+    session_service: SessionService = Depends(get_session_service)  # Utilise la fonction
 ):
-    """Enregistre un nouvel utilisateur"""
+    """Création d'un nouveau compte utilisateur"""
+    auth_service = AuthService(db, session_service)
     try:
-        return await auth_service.register(user_in)
+        user = await auth_service.create_user(user_data)
+        return user
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
 
-@router.post("/login", 
-    response_model=Token,
-    description="Authenticate user and create session")
+@router.post("/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    auth_service: AuthService = Depends(get_auth_service)
+    db: AsyncSession = Depends(get_db),
+    session_service: SessionService = Depends(get_session_service)
 ):
-    """Authentifie un utilisateur"""
-    try:
-        return await auth_service.authenticate(
-            email=form_data.username,
-            password=form_data.password
-        )
-    except ValueError as e:
+    """Authentification et génération du token JWT"""
+    auth_service = AuthService(db, session_service)
+    user, token = await auth_service.authenticate_user(
+        form_data.username,
+        form_data.password
+    )
+    if not user or not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Identifiants incorrects"
         )
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": user
+    }
 
-@router.post("/logout",
-    status_code=status.HTTP_204_NO_CONTENT,
-    description="Logout current user")
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(current_user = Depends(get_current_user)):
+    """Récupération des informations de l'utilisateur connecté"""
+    return current_user
+
+@router.post("/logout")
 async def logout(
-    current_user: User = Depends(get_current_user),
-    auth_service: AuthService = Depends(get_auth_service)
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    session_service: SessionService = Depends(get_session_service)
 ):
-    """Déconnecte l'utilisateur courant"""
-    await auth_service.logout(current_user.id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    """Déconnexion de l'utilisateur"""
+    auth_service = AuthService(db, session_service)
+    await auth_service.logout(str(current_user.id))
+    return {"detail": "À bientôt dans les étoiles ! ✨"}
 
-@router.post("/password", 
-    status_code=status.HTTP_204_NO_CONTENT,
-    description="Change user password")
+
+@router.post("/password/change")
 async def change_password(
-    password_data: PasswordChange,
-    current_user: User = Depends(get_current_user),
-    auth_service: AuthService = Depends(get_auth_service)
+    data: PasswordChange,
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    session_service: SessionService = Depends(get_session_service)
 ):
-    """Change le mot de passe de l'utilisateur"""
+    """Changement de mot de passe"""
+    auth_service = AuthService(db, session_service)
+    user_service = UserService(db, auth_service)  # Utilisation du bon service
     try:
-        await auth_service.change_password(
+        await user_service.update_password(  # Appel de la bonne méthode
             current_user.id,
-            password_data.old_password,
-            password_data.new_password
+            data.old_password,
+            data.new_password
         )
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        # Déconnexion des autres sessions
+        await session_service.clear_user_sessions(current_user.id)
+        return {"detail": "Mot de passe mis à jour avec succès"}
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
 
-@router.get("/me", 
-    response_model=User,
-    description="Get current user information")
-async def read_users_me(
-    current_user: User = Depends(get_current_user)
-):
-    """Retourne les informations de l'utilisateur courant"""
-    return current_user
+@router.get("/debug-redis")
+async def debug_redis(session_service: SessionService = Depends(get_session_service)):
+    """Endpoint temporaire pour déboguer Redis"""
+    try:
+        # Tester la connexion
+        ping_result = await session_service.redis.ping()
+        
+        # Lister toutes les clés de session
+        keys = []
+        async for key in session_service.redis.scan_iter(f"{session_service.prefix}*"):
+            keys.append(key.decode())
+        
+        # Récupérer les valeurs pour chaque clé
+        values = {}
+        for key in keys:
+            value = await session_service.redis.get(key)
+            if value:
+                values[key] = json.loads(value)
+            
+        return {
+            "ping": ping_result,
+            "keys": keys,
+            "values": values
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}

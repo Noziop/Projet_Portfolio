@@ -1,59 +1,117 @@
-# schemas/user.py
-from pydantic import BaseModel, EmailStr, Field, constr
-from typing import Optional
+# app/schemas/user.py
 from datetime import datetime
-from app.domain.value_objects.user_types import UserRole, UserLevel
+from typing import Optional, List
+from uuid import UUID
+from pydantic import BaseModel, Field, EmailStr, validator
+from app.domain.value_objects.user_types import UserLevel, UserRole
 
 class UserBase(BaseModel):
-    email: EmailStr
-    username: constr(min_length=8, max_length=20, pattern=r"^[a-zA-Z0-9_-]+$") = Field(
-        ...,
-        description="Username: 8-20 caractères, lettres, chiffres, - et _"
+    """Attributs communs pour tous les schemas User"""
+    email: EmailStr = Field(..., description="Email de l'utilisateur")
+    username: str = Field(
+        ..., 
+        description="Nom d'utilisateur",
+        min_length=3,
+        max_length=100
     )
-    firstname: Optional[constr(min_length=2, max_length=30, pattern=r"^[a-zA-Z\s-]+$")] = Field(
-        None,
-        description="Prénom: 2-30 caractères, lettres et -"
+    firstname: Optional[str] = Field(None, max_length=100)
+    lastname: Optional[str] = Field(None, max_length=100)
+    level: UserLevel = Field(
+        default=UserLevel.BEGINNER,
+        description="Niveau d'expertise"
     )
-    lastname: Optional[constr(min_length=2, max_length=30, pattern=r"^[a-zA-Z\s-]+$")] = Field(
-        None,
-        description="Nom: 2-30 caractères, lettres et -"
+    role: UserRole = Field(
+        default=UserRole.USER,
+        description="Rôle de l'utilisateur"
     )
-    level: UserLevel = Field(default_factory=UserLevel.get_default)
-    role: UserRole = Field(default_factory=UserRole.get_default)
+    is_active: bool = Field(default=True, description="Compte actif ou non")
 
 class UserCreate(UserBase):
+    """Schema pour la création d'un utilisateur"""
     password: str = Field(
-        ...,
-        min_length=12,
-        description="Mot de passe: min 12 caractères"
+        ..., 
+        min_length=8,
+        description="Mot de passe en clair"
     )
 
+    @validator('password')
+    def validate_password(cls, v):
+        if not any(c.isupper() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+        if not any(c.islower() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins une minuscule")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+        return v
+
 class UserUpdate(BaseModel):
+    """Schema pour la mise à jour d'un utilisateur"""
     email: Optional[EmailStr] = None
-    username: Optional[constr(min_length=8, max_length=20, pattern=r"^[a-zA-Z0-9_-]+$")] = None
-    firstname: Optional[constr(min_length=2, max_length=30, pattern=r"^[a-zA-Z\s-]+$")] = None
-    lastname: Optional[constr(min_length=2, max_length=30, pattern=r"^[a-zA-Z\s-]+$")] = None
+    username: Optional[str] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    password: Optional[str] = None
     level: Optional[UserLevel] = None
-    role: Optional[UserRole] = None
     is_active: Optional[bool] = None
 
+    @validator('username')
+    def validate_username(cls, v):
+        if v is not None and (len(v) < 3 or len(v) > 100):
+            raise ValueError("Le nom d'utilisateur doit faire entre 3 et 100 caractères")
+        return v
+
 class UserInDB(UserBase):
-    id: str
+    """Schema pour un utilisateur en DB"""
+    id: UUID
+    hashed_password: str
     created_at: datetime
     last_login: Optional[datetime] = None
-    is_active: bool = True
 
     class Config:
         from_attributes = True
 
-class User(UserInDB):
-    """Schéma de réponse API (sans le hashed_password)"""
-    pass
+class UserStats(BaseModel):
+    """Statistiques utilisateur"""
+    total_jobs: int = Field(..., description="Nombre total de traitements")
+    successful_jobs: int = Field(..., description="Traitements réussis")
+    favorite_presets: List[str] = Field(..., description="Presets les plus utilisés")
+    storage_usage: float = Field(..., description="Espace utilisé (Go)")
+    last_activity: Optional[datetime] = Field(None, description="Dernière activité")
 
-class PasswordChange(BaseModel):
-    old_password: str = Field(..., min_length=12)
-    new_password: str = Field(
-        ...,
-        min_length=12,
-        description="Nouveau mot de passe: min 12 caractères"
+class UserResponse(UserBase):
+    """Schema pour la réponse API"""
+    id: UUID
+    created_at: datetime
+    last_login: Optional[datetime]
+    stats: Optional[UserStats] = None
+    display_name: Optional[str] = Field(
+        None,
+        description="Nom complet formaté"
     )
+
+    @validator('display_name', always=True)
+    def set_display_name(cls, v, values):
+        if not v:
+            firstname = values.get('firstname', '')
+            lastname = values.get('lastname', '')
+            if firstname and lastname:
+                return f"{firstname} {lastname}"
+            return values.get('username', '')
+        return v
+
+    class Config:
+        from_attributes = True
+
+class UserListResponse(BaseModel):
+    """Schema pour la liste paginée des utilisateurs"""
+    items: List[UserResponse]
+    total: int
+    page: int
+    size: int
+
+class Token(BaseModel):
+    """Schema pour le token d'authentification"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse

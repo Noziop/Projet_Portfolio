@@ -1,49 +1,28 @@
 # app/api/v1/router.py
 from fastapi import APIRouter, Depends
 from app.api.deps import get_current_user
-from app.api.v1.endpoints import auth, telescopes, telescope_management, objects, observations, tasks, health
+from app.api.v1.endpoints import auth, telescopes, targets, presets, tasks, health
+from app.api.v1.endpoints.ws.connection import router as ws_router
 
 api_router = APIRouter()
 
-# Routes d'authentification
-api_router.include_router(
-    auth.router,
-    prefix="/auth",
-)
+# Routes publiques
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(health.router, prefix="/health", tags=["health"])
 
-api_router.include_router(
-    telescopes.router,
-    tags=["telescopes"],
-    dependencies=[Depends(get_current_user)]
-)
+# Routes protégées (tout le reste)
+protected_routes = [
+    (telescopes.router, "telescopes"),
+    (targets.router, "targets"),
+    (presets.router, "presets"),
+    (tasks.router, "tasks"),
+    (ws_router, "ws")
+]
 
-
-# Routes d'administration des télescopes
-api_router.include_router(
-    telescope_management.router,
-    prefix="/admin/telescopes",
-    tags=["telescope-management"],
-    dependencies=[Depends(get_current_user)]
-)
-
-api_router.include_router(
-    observations.router,
-    prefix="/observations",
-    tags=["observations"]
-)
-api_router.include_router(
-    tasks.router,
-    prefix="/tasks",
-    tags=["tasks"]
-)
-api_router.include_router(
-    objects.router,
-    prefix="/objects",
-    tags=["objects"]
-)
-
-api_router.include_router(
-    health.router,
-    prefix="/health",
-    tags=["health"]
-)
+for router, tag in protected_routes:
+    api_router.include_router(
+        router,
+        prefix=f"/{tag}",
+        tags=[tag],
+        dependencies=[Depends(get_current_user)]
+    )

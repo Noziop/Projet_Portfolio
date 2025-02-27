@@ -7,13 +7,13 @@ from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import settings
-from app.core.session import SessionManager
 from app.db.session import AsyncSessionLocal
 from app.domain.models.user import User, UserRole
 from app.infrastructure.repositories.models.user import User as UserModel
+from app.services.auth.session import SessionService
+from redis.asyncio import Redis
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
-session_manager = SessionManager()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
@@ -33,12 +33,36 @@ def convert_to_domain_user(db_user: UserModel) -> User:
         level=db_user.level,
         created_at=db_user.created_at,
         last_login=db_user.last_login,
-        is_active=db_user.is_active
+        is_active=db_user.is_active,
+        hashed_password=db_user.hashed_password
     )
+
+async def get_session_service() -> SessionService:
+    """Dépendance pour obtenir une instance de SessionService"""
+    from app.core.redis import redis_client
+    
+    print(f"DEBUG - Configuration Redis: host={settings.REDIS_HOST}, port={settings.REDIS_PORT}, db={settings.REDIS_SESSION_DB}")
+    
+    # Créer une nouvelle instance Redis à chaque fois pour être sûr
+    async_redis = Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        db=settings.REDIS_SESSION_DB
+    )
+    
+    # Test de connexion
+    try:
+        ping_result = await async_redis.ping()
+        print(f"DEBUG - Ping Redis: {ping_result}")
+    except Exception as e:
+        print(f"DEBUG - Erreur connexion Redis: {str(e)}")
+    
+    return SessionService(async_redis)
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: str = Depends(oauth2_scheme),
+    session_service: SessionService = Depends(get_session_service)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,18 +70,24 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        # Décode le token JWT
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        print(f"DEBUG - Contenu du token JWT: {payload}")
         user_id: str = payload.get("sub")
         if user_id is None:
+            print("DEBUG - Pas d'ID utilisateur dans le token")
             raise credentials_exception
-    except JWTError:
+    except JWTError as e:
+        print(f"DEBUG - Erreur JWT: {str(e)}")
         raise credentials_exception
 
-    # Vérification session Redis
-    session = await session_manager.get_session(user_id)
+    # Vérification session Redis avec l'ID utilisateur
+    print(f"DEBUG - Vérification session pour l'utilisateur {user_id}")
+    session = await session_service.get_session(user_id)
     if not session:
+        print(f"DEBUG - Session non trouvée pour l'utilisateur {user_id}")
         raise credentials_exception
 
     # Utilisation de select() avec async
@@ -66,8 +96,10 @@ async def get_current_user(
     db_user = result.scalar_one_or_none()
     
     if db_user is None:
+        print(f"DEBUG - Utilisateur {user_id} non trouvé dans la base de données")
         raise credentials_exception
-        
+    
+    print(f"DEBUG - Utilisateur {user_id} authentifié avec succès")
     return convert_to_domain_user(db_user)
 
 def require_role(*roles: UserRole):
