@@ -1,99 +1,59 @@
-# app/infrastructure/repositories/processing_repository.py
-from typing import Optional, List
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from datetime import datetime
+# app/infrastructure/repositories/processing_repository.py - Version corrigée
+from typing import List, Optional, Dict
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.repositories.base_repository import BaseRepository
+from app.infrastructure.repositories.models.processing import ProcessingJob
+from app.domain.value_objects.processing_types import ProcessingStatus
+from uuid import UUID
 
-from .base_repository import BaseRepository
-from ..repositories.models.processing import ProcessingJob as ProcessingJobModel, JobStatus
-from app.domain.models.task import TaskStatus
-from app.domain.models.processing import ProcessingJob
+class ProcessingRepository(BaseRepository[ProcessingJob]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(ProcessingJob, session)
 
-class ProcessingJobRepository(BaseRepository[ProcessingJob]):
-    def __init__(self, db_session: Session):
-        super().__init__(db_session)
+    async def get_by_user(self, user_id: UUID, status: Optional[ProcessingStatus] = None) -> List[ProcessingJob]:
+        query = select(ProcessingJob).where(ProcessingJob.user_id == str(user_id))
+        if status:
+            query = query.where(ProcessingJob.status == status)
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
-    async def get_by_id(self, id: str) -> Optional[ProcessingJob]:
-        query = select(ProcessingJobModel).where(ProcessingJobModel.id == id)
-        result = await self.db_session.execute(query)
-        db_job = result.scalar_one_or_none()
-        
-        if db_job is None:
+    async def get_by_target(self, target_id: UUID) -> List[ProcessingJob]:
+        query = select(ProcessingJob).where(ProcessingJob.target_id == str(target_id))
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def update_intermediate_results(self, job_id: UUID, results: Dict) -> bool:
+        """Met à jour les résultats intermédiaires"""
+        job = await self.get(job_id)
+        if job:
+            job.intermediate_results = results
+            await self.session.commit()
+            return True
+        return False
+
+    async def get_job_stats(self, job_id: UUID) -> Optional[Dict]:
+        """Récupère les statistiques d'un job"""
+        job = await self.get(job_id)
+        if not job:
             return None
-            
-        return ProcessingJob(
-            id=str(db_job.id),
-            user_id=db_job.user_id,
-            telescope_id=db_job.telescope_id,
-            workflow_id=db_job.workflow_id,
-            status=TaskStatus[db_job.status.upper()],
-            created_at=db_job.created_at,
-            completed_at=db_job.completed_at,
-            result_url=db_job.result_url
-        )
 
-    async def list_by_user(self, user_id: str) -> List[ProcessingJob]:
-        query = select(ProcessingJobModel).where(ProcessingJobModel.user_id == user_id)
-        result = await self.db_session.execute(query)
-        db_jobs = result.scalars().all()
+        # Modifier cette requête pour utiliser des champs qui existent réellement
+        # Par exemple, compter le nombre d'étapes au lieu d'utiliser progress
+        query = select(
+            func.count().label('total_steps'),
+            # Remplacer par une métrique qui existe ou supprimer cette ligne
+            func.count(ProcessingJob.steps).label('avg_progress')
+        ).where(ProcessingJob.id == str(job_id))
         
-        return [
-            ProcessingJob(
-                id=str(db_job.id),
-                user_id=db_job.user_id,
-                telescope_id=db_job.telescope_id,
-                workflow_id=db_job.workflow_id,
-                status=TaskStatus[db_job.status.upper()],
-                created_at=db_job.created_at,
-                completed_at=db_job.completed_at,
-                result_url=db_job.result_url
-            )
-            for db_job in db_jobs
-        ]
+        result = await self.session.execute(query)
+        stats = result.first()
 
-    async def create(self, job: ProcessingJob) -> ProcessingJob:
-        db_job = ProcessingJobModel(
-            user_id=job.user_id,
-            telescope_id=job.telescope_id,
-            workflow_id=job.workflow_id,
-            status=job.status.value,
-            created_at=job.created_at,
-            completed_at=job.completed_at,
-            result_url=job.result_url
-        )
-        
-        self.db_session.add(db_job)
-        await self.db_session.commit()
-        await self.db_session.refresh(db_job)
-        
-        return job
-
-    async def update_status(self, job_id: str, status: TaskStatus, result_url: Optional[str] = None) -> ProcessingJob:
-        query = select(ProcessingJobModel).where(ProcessingJobModel.id == job_id)
-        result = await self.db_session.execute(query)
-        db_job = result.scalar_one_or_none()
-        
-        if db_job is None:
-            raise ValueError(f"ProcessingJob with id {job_id} not found")
-            
-        db_job.status = status.value
-        db_job.completed_at = datetime.utcnow() if status == TaskStatus.COMPLETED else None
-        db_job.result_url = result_url
-        
-        await self.db_session.commit()
-        await self.db_session.refresh(db_job)
-        
-        return await self.get_by_id(job_id)
-
-    async def delete(self, id: str) -> bool:
-        query = select(ProcessingJobModel).where(ProcessingJobModel.id == id)
-        result = await self.db_session.execute(query)
-        db_job = result.scalar_one_or_none()
-        
-        if db_job is None:
-            return False
-            
-        await self.db_session.delete(db_job)
-        await self.db_session.commit()
-        
-        return True
+        return {
+            "status": job.status,
+            # Remplacer progress par une autre métrique ou le supprimer
+            "progress": len(job.steps) if job.steps else 0,  # Utiliser la longueur des étapes comme indicateur de progression
+            "total_steps": stats.total_steps,
+            "average_progress": stats.avg_progress,
+            "intermediate_results": job.intermediate_results
+        }
