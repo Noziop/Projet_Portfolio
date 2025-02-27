@@ -1,7 +1,7 @@
 # app/core/session.py
 from typing import Optional
 import json
-from redis import Redis
+from redis.asyncio import Redis
 from app.core.config import settings
 
 class SessionManager:
@@ -13,20 +13,66 @@ class SessionManager:
         self.prefix = "session:"
         self.expire_time = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
 
-    def create_session(self, user_id: int, data: dict) -> str:
+    async def create_session(self, user_id: str, data: dict) -> bool:
+        """Crée une session en utilisant l'ID utilisateur comme clé"""
         session_key = f"{self.prefix}{user_id}"
-        self.redis.setex(
-            session_key,
-            self.expire_time,
-            json.dumps(data)
-        )
-        return session_key
+        
+        # Préparer les données de session
+        session_data = {
+            "user_id": user_id,
+            **data
+        }
+        
+        print(f"Debug - Création session: clé={session_key}")
+        try:
+            result = await self.redis.setex(
+                session_key,
+                self.expire_time,
+                json.dumps(session_data)
+            )
+            print(f"Debug - Résultat création session: {result}")
+            
+            # Vérification immédiate
+            verification = await self.redis.get(session_key)
+            print(f"Debug - Vérification session: {verification}")
+            
+            return True
+        except Exception as e:
+            print(f"Debug - ERREUR création session: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return False
 
-    def get_session(self, user_id: int) -> Optional[dict]:
+    async def get_session(self, user_id: str) -> Optional[dict]:
+        """Récupère une session en utilisant l'ID utilisateur comme clé"""
         session_key = f"{self.prefix}{user_id}"
-        data = self.redis.get(session_key)
-        return json.loads(data) if data else None
+        print(f"Debug - Récupération session: clé={session_key}")
+        
+        data = await self.redis.get(session_key)
+        print(f"Debug - Données session: {data}")
+        
+        if data:
+            # Rafraîchir l'expiration
+            await self.redis.expire(session_key, self.expire_time)
+            return json.loads(data)
+        return None
 
-    def revoke_session(self, user_id: int) -> bool:
+    async def revoke_session(self, user_id: str) -> bool:
+        """Supprime une session en utilisant l'ID utilisateur comme clé"""
         session_key = f"{self.prefix}{user_id}"
-        return bool(self.redis.delete(session_key))
+        return bool(await self.redis.delete(session_key))
+
+    async def update_session(self, user_id: str, data: dict) -> bool:
+        """Met à jour une session existante"""
+        session_key = f"{self.prefix}{user_id}"
+        existing_data = await self.redis.get(session_key)
+        
+        if existing_data:
+            updated_data = {**json.loads(existing_data), **data}
+            await self.redis.setex(
+                session_key,
+                self.expire_time,
+                json.dumps(updated_data)
+            )
+            return True
+        return False

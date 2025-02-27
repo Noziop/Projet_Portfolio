@@ -18,7 +18,8 @@ services:
     labels:
       - "traefik.enable=true"
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.7
 
   prometheus:
     image: prom/prometheus:latest
@@ -104,14 +105,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
-      - PYTHONPATH=/app
-      - CELERY_WORKER_NAME=download-%(n)d
+    - PYTHONPATH=/app
+    - CELERY_WORKER_NAME=download-worker-${HOSTNAME}
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
     env_file:
       - .env
-    command: celery -A app.core.celery worker -Q download_queue -n download@%h --loglevel=info
+    command: >
+      celery -A app.core.celery worker 
+      -Q download_queue 
+      -n "download-worker-$${HOSTNAME}@%h" 
+      --loglevel=info
     depends_on:
       redis:
         condition: service_healthy
@@ -137,14 +142,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
-      - PYTHONPATH=/app
-      - CELERY_WORKER_NAME=processing-%(n)d
+    - PYTHONPATH=/app
+    - CELERY_WORKER_NAME=processing-worker-${HOSTNAME}
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
     env_file:
       - .env
-    command: celery -A app.core.celery worker -Q processing_queue -n processing@%h --loglevel=info
+    command: >
+      celery -A app.core.celery worker 
+      -Q processing_queue 
+      -n "processing-worker-$${HOSTNAME}@%h" 
+      --loglevel=info
     depends_on:
       redis:
         condition: service_healthy
@@ -168,8 +177,7 @@ services:
     image: grafana/celery-exporter
     command: >
       --broker-url=redis://redis:6379/0
-      --queue-labels=download_queue:type=download,processing_queue:type=processing
-      --task-labels=app.tasks.download:type=download,app.tasks.processing:type=processing
+      --queues=download_queue:type=download,processing_queue:type=processing
     environment:
       - TZ=Europe/Paris
       - CE_BROKER_URL=redis://redis:6379/0
@@ -298,3 +306,7 @@ volumes:
 networks:
   traefik_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/24
+          gateway: 172.18.0.1

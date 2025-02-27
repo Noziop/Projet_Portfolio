@@ -27,7 +27,7 @@ htmlcov/
 env/
 venv/
 ENV/
-@eaDir/
+*eaDir/
 ../backup/
 
 # Node/Vue
@@ -59,3 +59,6 @@ downloads/
 telescope_service.txt
 backend/tmp/*
 !backend/tmp/.gitkeep
+@eaDir/
+*@eaDir*
+backend/z_export/

@@ -15,19 +15,11 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 
-# Import Base en premier
-from app.db.base_class import Base
 
 print("Importing models...")
 try:
     # Import des modèles dans l'ordre
-    from app.infrastructure.repositories.models.user import User
-    from app.infrastructure.repositories.models.telescope import SpaceTelescope
-    from app.infrastructure.repositories.models.workflow import Workflow
-    from app.infrastructure.repositories.models.observation import Observation
-    from app.infrastructure.repositories.models.processing import ProcessingJob
-    from app.infrastructure.repositories.models.task import Task
-    from app.infrastructure.repositories.models.target import Target
+    from app.db.base_class import Base
     print("Models imported successfully!")
     print(f"Tables in metadata: {Base.metadata.tables.keys()}")
 except Exception as e:

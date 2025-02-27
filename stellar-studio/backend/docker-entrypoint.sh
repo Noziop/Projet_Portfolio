@@ -32,5 +32,5 @@ BACKGROUND_PID=$!
 
 # Démarrer l'application
 poetry run alembic upgrade head
-poetry run python -c "from app.db.init_db import init_db; from app.db.session import SessionLocal; init_db(SessionLocal())"
+poetry run python -c "from app.db.init_db import init_db; from app.db.session import AsyncSessionLocal; init_db(AsyncSessionLocal())"
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
