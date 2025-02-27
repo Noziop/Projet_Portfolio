@@ -1,0 +1,144 @@
+erDiagram
+    USERS ||--o{ OBSERVATIONS : creates
+    USERS ||--o{ PROCESSING_JOBS : launches
+    USERS ||--o{ TASKS : owns
+    USERS {
+        char(36) id PK
+        string email "unique, index"
+        string username "unique, index"
+        string hashed_password
+        string firstname "nullable"
+        string lastname "nullable"
+        enum level "default value"
+        enum role "default value"
+        datetime created_at
+        datetime last_login "nullable"
+        boolean is_active "Default: true"
+    }
+
+    TARGETS ||--o{ TARGET_FILES : contains
+    TARGETS ||--o{ PROCESSING_JOBS : processes
+    TARGETS }o--|| SPACE_TELESCOPES : belongs_to
+    TARGETS }o--o{ PRESETS : has_available
+    TARGETS {
+        char(36) id PK
+        string name
+        text description
+        char(36) telescope_id FK
+        string coordinates_ra_deg "unité: degrés"
+        string coordinates_dec_deg "unité: degrés"
+        enum object_type
+        enum status
+    }
+
+    OBSERVATIONS }o--|| SPACE_TELESCOPES : captured_by
+    OBSERVATIONS {
+        char(36) id PK
+        char(36) telescope_id FK
+        string target_id FK
+        string coordinates_ra_deg "unité: degrés"
+        string coordinates_dec_deg "unité: degrés"
+        datetime start_time
+        integer exposure_time_seconds "unité: secondes"
+        enum instrument_type
+        json filters
+        json fits_files
+        string preview_url
+    }
+
+    TARGET_FILES }o--|| FILTERS : uses
+    TARGET_FILES }o--|| TARGETS : belongs_to
+    TARGET_FILES {
+        char(36) id PK
+        char(36) target_id FK
+        char(36) filter_id FK
+        string file_path
+        bigint file_size "unité: octets"
+        boolean is_stored_in_minio
+        json fits_metadata
+        datetime created_at
+        datetime updated_at
+    }
+
+    PROCESSING_JOBS }o--|| USERS : owned_by
+    PROCESSING_JOBS }o--|| SPACE_TELESCOPES : uses
+    PROCESSING_JOBS }o--|| WORKFLOWS : follows
+    PROCESSING_JOBS }o--|| TASKS : tracked_by
+    PROCESSING_JOBS }o--|| PRESETS : configured_by
+    PROCESSING_JOBS {
+        char(36) id PK
+        char(36) user_id FK
+        char(36) telescope_id FK
+        char(36) workflow_id FK
+        char(36) task_id FK
+        enum status "Enum: [pending, processing, completed, failed, cancelled], default: pending"
+        json steps
+        enum current_step
+        datetime created_at
+        datetime completed_at "nullable"
+        string result_url
+        text error_message
+    }
+
+    TASKS }o--|| USERS : owned_by
+    TASKS ||--o{ PROCESSING_JOBS : tracks
+    TASKS {
+        char(36) id PK
+        char(36) user_id FK
+        enum type
+        enum status
+        datetime created_at
+        datetime updated_at
+        json parameters
+        json result
+    }
+
+    PRESETS }o--|| SPACE_TELESCOPES : belongs_to
+    PRESETS }o--o{ FILTERS : requires
+    PRESETS }o--o{ TARGETS : available_for
+    PRESETS ||--o{ PROCESSING_JOBS : configures
+    PRESETS {
+        char(36) id PK
+        string name
+        string description
+        json processing_params
+        char(36) telescope_id FK
+    }
+
+    FILTERS }o--|| SPACE_TELESCOPES : belongs_to
+    FILTERS ||--o{ TARGET_FILES : used_in
+    FILTERS }o--o{ PRESETS : used_by
+    FILTERS {
+        char(36) id PK
+        string name
+        char(36) telescope_id FK
+        float wavelength_nm "unité: nanomètres"
+        string description
+    }
+
+    SPACE_TELESCOPES ||--o{ OBSERVATIONS : provides
+    SPACE_TELESCOPES ||--o{ FILTERS : has
+    SPACE_TELESCOPES ||--o{ PRESETS : offers
+    SPACE_TELESCOPES ||--o{ TARGETS : hosts
+    SPACE_TELESCOPES {
+        char(36) id PK
+        string name
+        text description
+        string aperture_mm "unité: millimètres"
+        string focal_length_mm "unité: millimètres"
+        string location
+        json instruments
+        string api_endpoint
+        enum status
+    }
+
+    WORKFLOWS ||--o{ PROCESSING_JOBS : guides
+    WORKFLOWS {
+        char(36) id PK
+        string name
+        text description
+        json steps
+        boolean is_default
+        string target_type
+        json required_filters
+    }
