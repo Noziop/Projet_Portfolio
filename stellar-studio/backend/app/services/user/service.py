@@ -1,108 +1,139 @@
-# services/user/service.py
+# app/services/user/service.py
 from typing import Optional, List
-from datetime import datetime, timezone
-from app.domain.models.user import User
-from app.domain.value_objects.user_types import UserRole, UserLevel
+from uuid import UUID
+from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram
 from app.infrastructure.repositories.user_repository import UserRepository
-from app.schemas.user import UserCreate, UserUpdate
+from app.infrastructure.repositories.models.user import User
+from app.domain.value_objects.user_types import UserLevel, UserRole
+from app.services.auth.service import AuthService
+
+# Métriques Prometheus
+user_operations = Counter(
+    'user_operations_total',
+    'Total number of user operations',
+    ['operation']  # create, update, deactivate, reactivate
+)
+
+user_operation_duration = Histogram(
+    'user_operation_duration_seconds',
+    'Time spent processing user operations',
+    buckets=(0.1, 0.25, 0.5, 1.0, 2.5)
+)
 
 class UserService:
-    def __init__(self, user_repository: UserRepository):
-        self.user_repository = user_repository
+    def __init__(self, session: AsyncSession, auth_service: AuthService):
+        self.user_repository = UserRepository(session)
+        self.auth_service = auth_service
 
-    async def get_user(self, user_id: str) -> Optional[User]:
-        return await self.user_repository.get_by_id(user_id)
+    async def create_user(
+        self,
+        email: str,
+        username: str,
+        password: str,
+        level: UserLevel = UserLevel.BEGINNER,
+        role: UserRole = UserRole.USER,
+        firstname: Optional[str] = None,
+        lastname: Optional[str] = None
+    ) -> User:
+        """Crée un nouvel utilisateur"""
+        with user_operation_duration.time():
+            if await self.user_repository.get_by_email(email):
+                raise ValueError("Email déjà utilisé")
+            if await self.user_repository.get_by_username(username):
+                raise ValueError("Nom d'utilisateur déjà utilisé")
 
-    async def get_by_email(self, email: str) -> Optional[User]:
-        return await self.user_repository.get_by_email(email)
+            user = User(
+                email=email,
+                username=username,
+                hashed_password=self.auth_service.get_password_hash(password),
+                level=level,
+                role=role,
+                firstname=firstname,
+                lastname=lastname
+            )
+            created_user = await self.user_repository.create(user)
+            user_operations.labels(operation='create').inc()
+            return created_user
 
-    async def get_by_username(self, username: str) -> Optional[User]:
-        return await self.user_repository.get_by_username(username)
+    async def get_user(self, user_id: UUID) -> Optional[User]:
+        """Récupère un utilisateur par son ID"""
+        return await self.user_repository.get(user_id)
 
-    async def create_user(self, user_data: UserCreate, hashed_password: str) -> User:
-        # Vérifications métier
-        if await self.get_by_email(user_data.email.lower()):
-            raise ValueError("Email already registered")
+    async def update_user(
+        self,
+        user_id: UUID,
+        email: Optional[str] = None,
+        username: Optional[str] = None,
+        level: Optional[UserLevel] = None,
+        firstname: Optional[str] = None,
+        lastname: Optional[str] = None
+    ) -> Optional[User]:
+        """Met à jour les informations d'un utilisateur"""
+        with user_operation_duration.time():
+            user = await self.user_repository.get(user_id)
+            if not user:
+                return None
 
-        if await self.get_by_username(user_data.username):
-            raise ValueError("Username already taken")
+            if email and email != user.email:
+                if await self.user_repository.get_by_email(email):
+                    raise ValueError("Email déjà utilisé")
+                user.email = email
 
-        if user_data.username.lower() in ["admin", "root", "system", "superuser"]:
-            raise ValueError("This username is reserved")
+            if username and username != user.username:
+                if await self.user_repository.get_by_username(username):
+                    raise ValueError("Nom d'utilisateur déjà utilisé")
+                user.username = username
 
-        user = User(
-            id="",  # Sera généré par le repository
-            email=user_data.email.lower(),
-            username=user_data.username,
-            firstname=user_data.firstname.strip() if user_data.firstname else None,
-            lastname=user_data.lastname.strip() if user_data.lastname else None,
-            role=user_data.role or UserRole.get_default(),
-            level=user_data.level or UserLevel.get_default(),
-            created_at=datetime.now(timezone.utc),
-            last_login=None,
-            is_active=True
-        )
-        
-        return await self.user_repository.create(user, hashed_password)
+            if level:
+                user.level = level
+            if firstname:
+                user.firstname = firstname
+            if lastname:
+                user.lastname = lastname
 
-    async def update_user(self, user_id: str, user_data: UserUpdate) -> User:
-        user = await self.get_user(user_id)
+            updated_user = await self.user_repository.update(user)
+            user_operations.labels(operation='update').inc()
+            return updated_user
+
+    async def update_password(
+        self,
+        user_id: UUID,
+        current_password: str,
+        new_password: str
+    ) -> bool:
+        """Met à jour le mot de passe d'un utilisateur"""
+        user = await self.user_repository.get(user_id)
         if not user:
-            raise ValueError("User not found")
+            return False
 
-        # Vérification email unique si changé
-        if user_data.email and user_data.email.lower() != user.email:
-            if await self.get_by_email(user_data.email.lower()):
-                raise ValueError("Email already registered")
+        if not self.auth_service.verify_password(current_password, user.hashed_password):
+            raise ValueError("Mot de passe actuel incorrect")
 
-        # Vérification username unique si changé
-        if user_data.username and user_data.username != user.username:
-            if await self.get_by_username(user_data.username):
-                raise ValueError("Username already taken")
-            if user_data.username.lower() in ["admin", "root", "system", "superuser"]:
-                raise ValueError("This username is reserved")
+        user.hashed_password = self.auth_service.get_password_hash(new_password)
+        await self.user_repository.update(user)
+        return True
 
-        # Mise à jour des attributs
-        update_data = user_data.model_dump(exclude_unset=True)
-        
-        # Nettoyage des données
-        if "email" in update_data:
-            update_data["email"] = update_data["email"].lower()
-        if "firstname" in update_data:
-            update_data["firstname"] = update_data["firstname"].strip() if update_data["firstname"] else None
-        if "lastname" in update_data:
-            update_data["lastname"] = update_data["lastname"].strip() if update_data["lastname"] else None
+    async def deactivate_user(self, user_id: UUID) -> bool:
+        """Désactive un compte utilisateur"""
+        with user_operation_duration.time():
+            user = await self.user_repository.get(user_id)
+            if not user:
+                return False
 
-        # Vérification des permissions pour changer le rôle
-        if "role" in update_data and update_data["role"] != user.role:
-            if user.role == UserRole.ADMIN:
-                raise ValueError("Cannot change admin role")
+            user.is_active = False
+            await self.user_repository.update(user)
+            user_operations.labels(operation='deactivate').inc()
+            return True
 
-        for key, value in update_data.items():
-            setattr(user, key, value)
+    async def reactivate_user(self, user_id: UUID) -> bool:
+        """Réactive un compte utilisateur"""
+        with user_operation_duration.time():
+            user = await self.user_repository.get(user_id)
+            if not user:
+                return False
 
-        return await self.user_repository.update(user)
-
-    async def delete_user(self, user_id: str, current_user_role: UserRole) -> bool:
-        user = await self.get_user(user_id)
-        if not user:
-            raise ValueError("User not found")
-
-        # Vérifications métier avant suppression
-        if user.role == UserRole.ADMIN:
-            if current_user_role != UserRole.ADMIN:
-                raise ValueError("Only admin can delete admin users")
-            
-            # Vérifier s'il reste d'autres admins
-            admins = await self.list_users(role=UserRole.ADMIN)
-            if len(admins) <= 1:
-                raise ValueError("Cannot delete last admin user")
-
-        return await self.user_repository.delete(user_id)
-
-    async def list_users(self, role: Optional[UserRole] = None) -> List[User]:
-        """Liste les utilisateurs avec filtre optionnel par rôle"""
-        users = await self.user_repository.list_all()
-        if role:
-            return [user for user in users if user.role == role]
-        return users
+            user.is_active = True
+            await self.user_repository.update(user)
+            user_operations.labels(operation='reactivate').inc()
+            return True
