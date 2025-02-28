@@ -53,7 +53,6 @@ async def get_session_service() -> SessionService:
     # Test de connexion
     try:
         ping_result = await async_redis.ping()
-        print(f"DEBUG - Ping Redis: {ping_result}")
     except Exception as e:
         print(f"DEBUG - Erreur connexion Redis: {str(e)}")
     
@@ -74,20 +73,15 @@ async def get_current_user(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        print(f"DEBUG - Contenu du token JWT: {payload}")
         user_id: str = payload.get("sub")
         if user_id is None:
-            print("DEBUG - Pas d'ID utilisateur dans le token")
             raise credentials_exception
     except JWTError as e:
-        print(f"DEBUG - Erreur JWT: {str(e)}")
         raise credentials_exception
 
     # Vérification session Redis avec l'ID utilisateur
-    print(f"DEBUG - Vérification session pour l'utilisateur {user_id}")
     session = await session_service.get_session(user_id)
     if not session:
-        print(f"DEBUG - Session non trouvée pour l'utilisateur {user_id}")
         raise credentials_exception
 
     # Utilisation de select() avec async
@@ -96,10 +90,8 @@ async def get_current_user(
     db_user = result.scalar_one_or_none()
     
     if db_user is None:
-        print(f"DEBUG - Utilisateur {user_id} non trouvé dans la base de données")
         raise credentials_exception
     
-    print(f"DEBUG - Utilisateur {user_id} authentifié avec succès")
     return convert_to_domain_user(db_user)
 
 def require_role(*roles: UserRole):

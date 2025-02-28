@@ -6,7 +6,7 @@ from app.core.config import settings
 # Création du moteur async
 engine = create_async_engine(
     settings.SQLALCHEMY_DATABASE_URI,  # Plus besoin du replace()
-    echo=True,
+    echo=False,
     future=True
 )
 

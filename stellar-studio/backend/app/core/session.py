@@ -23,18 +23,15 @@ class SessionManager:
             **data
         }
         
-        print(f"Debug - Création session: clé={session_key}")
         try:
             result = await self.redis.setex(
                 session_key,
                 self.expire_time,
                 json.dumps(session_data)
             )
-            print(f"Debug - Résultat création session: {result}")
             
             # Vérification immédiate
             verification = await self.redis.get(session_key)
-            print(f"Debug - Vérification session: {verification}")
             
             return True
         except Exception as e:
@@ -46,10 +43,8 @@ class SessionManager:
     async def get_session(self, user_id: str) -> Optional[dict]:
         """Récupère une session en utilisant l'ID utilisateur comme clé"""
         session_key = f"{self.prefix}{user_id}"
-        print(f"Debug - Récupération session: clé={session_key}")
         
         data = await self.redis.get(session_key)
-        print(f"Debug - Données session: {data}")
         
         if data:
             # Rafraîchir l'expiration

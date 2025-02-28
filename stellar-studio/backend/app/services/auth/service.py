@@ -7,6 +7,7 @@ from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
 from app.core.config import settings
+from app.schemas.user import UserCreate
 from app.infrastructure.repositories.user_repository import UserRepository
 from app.services.auth.session import SessionService
 from app.infrastructure.repositories.models.user import User
@@ -79,7 +80,6 @@ class AuthService:
             # Crée la session et vérifie le succès
             session_created = await self.session_service.create_session(user.id, session_data)
             if not session_created:
-                print(f"DEBUG - Échec de création de session pour {user.id}")
                 auth_attempts.labels(status='failed').inc()
                 return None, None
             
@@ -103,7 +103,6 @@ class AuthService:
             # Vérifie si la session existe
             session = await self.session_service.get_session(user_id)
             if not session:
-                print(f"DEBUG - Session non trouvée pour {user_id}")
                 return None
                 
             return await self.user_repository.get(user_id)
@@ -130,3 +129,16 @@ class AuthService:
         
         # Crée un nouveau token
         return self.create_access_token(user_id)
+
+    async def create_user(self, user_data: UserCreate) -> User:
+        """Crée un nouvel utilisateur"""
+        existing_user = await self.user_repository.get_by_email(user_data.email)
+        if existing_user:
+            raise ValueError("Email already registered")
+        
+        user_dict = user_data.model_dump(exclude={"password"})
+        
+        user = User(**user_dict)
+        user.hashed_password = self.get_password_hash(user_data.password)
+        
+        return await self.user_repository.create(user)

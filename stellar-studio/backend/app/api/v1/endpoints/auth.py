@@ -99,29 +99,29 @@ async def change_password(
             detail=str(e)
         )
 
-@router.get("/debug-redis")
-async def debug_redis(session_service: SessionService = Depends(get_session_service)):
-    """Endpoint temporaire pour déboguer Redis"""
-    try:
-        # Tester la connexion
-        ping_result = await session_service.redis.ping()
+# @router.get("/debug-redis")
+# async def debug_redis(session_service: SessionService = Depends(get_session_service)):
+#     """Endpoint temporaire pour déboguer Redis"""
+#     try:
+#         # Tester la connexion
+#         ping_result = await session_service.redis.ping()
         
-        # Lister toutes les clés de session
-        keys = []
-        async for key in session_service.redis.scan_iter(f"{session_service.prefix}*"):
-            keys.append(key.decode())
+#         # Lister toutes les clés de session
+#         keys = []
+#         async for key in session_service.redis.scan_iter(f"{session_service.prefix}*"):
+#             keys.append(key.decode())
         
-        # Récupérer les valeurs pour chaque clé
-        values = {}
-        for key in keys:
-            value = await session_service.redis.get(key)
-            if value:
-                values[key] = json.loads(value)
+#         # Récupérer les valeurs pour chaque clé
+#         values = {}
+#         for key in keys:
+#             value = await session_service.redis.get(key)
+#             if value:
+#                 values[key] = json.loads(value)
             
-        return {
-            "ping": ping_result,
-            "keys": keys,
-            "values": values
-        }
-    except Exception as e:
-        return {"error": str(e), "type": type(e).__name__}
+#         return {
+#             "ping": ping_result,
+#             "keys": keys,
+#             "values": values
+#         }
+#     except Exception as e:
+#         return {"error": str(e), "type": type(e).__name__}

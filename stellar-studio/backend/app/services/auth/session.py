@@ -1,7 +1,7 @@
 # app/services/auth/session.py
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 import json
 from redis.asyncio import Redis
 from prometheus_client import Counter, Histogram
@@ -26,11 +26,10 @@ class SessionService:
         self.prefix = "session:"
         self.expiration = timedelta(minutes=settings.SESSION_DURATION_MINUTES)
 
-    async def create_session(self, user_id: UUID, data: Dict[str, Any]) -> str:
-        """Crée une nouvelle session pour un utilisateur"""
+    async def create_session(self, user_id: UUID, data: Dict[str, Any]) -> bool:
+        """Crée une session en utilisant l'ID utilisateur comme clé"""
         with session_duration.time():
-            session_id = str(uuid4())
-            session_key = f"{self.prefix}{session_id}"
+            session_key = f"{self.prefix}{user_id}"
             
             session_data = {
                 "user_id": str(user_id),
@@ -38,19 +37,22 @@ class SessionService:
                 **data
             }
             
-            await self.redis.set(
-                session_key,
-                json.dumps(session_data),
-                ex=int(self.expiration.total_seconds())
-            )
-            
-            session_operations.labels(operation='create').inc()
-            return session_id
+            try:
+                result = await self.redis.set(
+                    session_key,
+                    json.dumps(session_data),
+                    ex=int(self.expiration.total_seconds())
+                )
+                session_operations.labels(operation='create').inc()
+                return True
+            except Exception as e:
+                print(f"Erreur lors de la création de session: {str(e)}")
+                return False
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Récupère les données d'une session"""
+    async def get_session(self, user_id: UUID) -> Optional[Dict[str, Any]]:
+        """Récupère les données d'une session en utilisant l'ID utilisateur"""
         with session_duration.time():
-            session_key = f"{self.prefix}{session_id}"
+            session_key = f"{self.prefix}{user_id}"
             data = await self.redis.get(session_key)
             
             if data:
@@ -63,10 +65,10 @@ class SessionService:
                 return json.loads(data)
             return None
 
-    async def update_session(self, session_id: str, data: Dict[str, Any]) -> bool:
+    async def update_session(self, user_id: UUID, data: Dict[str, Any]) -> bool:
         """Met à jour les données d'une session existante"""
         with session_duration.time():
-            session_key = f"{self.prefix}{session_id}"
+            session_key = f"{self.prefix}{user_id}"
             existing_data = await self.redis.get(session_key)
             
             if existing_data:
@@ -80,10 +82,10 @@ class SessionService:
                 return True
             return False
 
-    async def delete_session(self, session_id: str) -> bool:
+    async def delete_session(self, user_id: UUID) -> bool:
         """Supprime une session"""
         with session_duration.time():
-            session_key = f"{self.prefix}{session_id}"
+            session_key = f"{self.prefix}{user_id}"
             result = await self.redis.delete(session_key) > 0
             if result:
                 session_operations.labels(operation='delete').inc()
@@ -91,20 +93,17 @@ class SessionService:
 
     async def get_user_sessions(self, user_id: UUID) -> list[str]:
         """Récupère toutes les sessions actives d'un utilisateur"""
-        all_sessions = []
-        async for key in self.redis.scan_iter(f"{self.prefix}*"):
-            data = await self.redis.get(key)
-            if data:
-                session_data = json.loads(data)
-                if session_data.get("user_id") == str(user_id):
-                    all_sessions.append(key.decode().replace(self.prefix, ""))
-        return all_sessions
+        # Pour cette implémentation, il n'y a qu'une session par utilisateur
+        # donc on vérifie simplement si la session existe
+        session_key = f"{self.prefix}{user_id}"
+        data = await self.redis.get(session_key)
+        if data:
+            return [str(user_id)]
+        return []
 
     async def clear_user_sessions(self, user_id: UUID) -> int:
         """Supprime toutes les sessions d'un utilisateur"""
-        sessions = await self.get_user_sessions(user_id)
-        count = 0
-        for session_id in sessions:
-            if await self.delete_session(session_id):
-                count += 1
-        return count
+        # Comme il n'y a qu'une session par utilisateur, on supprime simplement celle-ci
+        if await self.delete_session(user_id):
+            return 1
+        return 0

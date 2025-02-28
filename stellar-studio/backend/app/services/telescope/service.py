@@ -51,6 +51,10 @@ class TelescopeService:
         telescopes = await self.telescope_repository.get_by_status(TelescopeStatus.ACTIVE)
         active_telescopes.set(len(telescopes))
         return telescopes
+    
+    async def get_by_status(self, status: TelescopeStatus) -> List[SpaceTelescope]:
+        """Récupère tous les télescopes par statut"""
+        return await self.telescope_repository.get_by_status(status)
 
     async def get_telescope_filters(self, telescope_id: UUID) -> List[Filter]:
         """Récupère tous les filtres disponibles pour un télescope"""

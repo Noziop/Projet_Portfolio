@@ -59,7 +59,7 @@ export default {
       
       loading.value = true
       try {
-        const response = await apiClient.get(`/observations/${selectedTelescope.value}/targets`)
+        const response = await apiClient.get(`/targets`)
         availableTargets.value = response.data
       } catch (error) {
         console.error('Failed to load targets:', error)
