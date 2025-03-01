@@ -3,7 +3,7 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
 const apiClient = axios.create({
-  baseURL: 'http://api.localhost/api/v1',
+  baseURL: 'https://api.stellarstudio.fassih.ch/api/v1',
   headers: {
     'Content-Type': 'application/json'
   }
