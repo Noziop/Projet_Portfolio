@@ -242,10 +242,58 @@ class TargetService:
 
         for preset in presets:
             is_available = await self.check_preset_availability(target_id, preset.id)
+            
+            # Extraire les données de base du preset pour faciliter la sérialisation
+            preset_dict = {
+                "id": preset.id,
+                "name": preset.name,
+                "description": preset.description,
+                "telescope_id": preset.telescope_id,
+                "target_type": preset.target_type,
+                "processing_params": preset.processing_params,
+                "created_at": preset.created_at,
+                "updated_at": preset.updated_at,
+                "telescope_name": preset.telescope.name if hasattr(preset, 'telescope') and preset.telescope else None,
+                # Inclure des listes vides pour les relations pour respecter le schéma
+                "filters": [],
+                "preset_filters": []
+            }
+            
+            # Ajouter des informations basiques sur les filtres si disponibles
+            if hasattr(preset, 'preset_filters'):
+                for pf in preset.preset_filters:
+                    if hasattr(pf, 'filter') and pf.filter:
+                        # Ajouter les informations complètes sur le filtre (FilterResponse)
+                        filter_dict = {
+                            "id": pf.filter.id,
+                            "name": pf.filter.name,
+                            "code": getattr(pf.filter, 'code', None),
+                            "wavelength": getattr(pf.filter, 'wavelength', 0),
+                            "filter_type": getattr(pf.filter, 'filter_type', None),
+                            "description": getattr(pf.filter, 'description', None),
+                            "telescope_id": getattr(pf.filter, 'telescope_id', None),
+                            "created_at": getattr(pf.filter, 'created_at', None),
+                            "updated_at": getattr(pf.filter, 'updated_at', None),
+                            "telescope_name": getattr(pf.filter.telescope, 'name', None) if hasattr(pf.filter, 'telescope') else None
+                        }
+                        preset_dict["filters"].append(filter_dict)
+                        
+                        # Ajouter les informations sur la relation preset-filtre (PresetFilterResponse)
+                        preset_filter_dict = {
+                            "id": pf.id if hasattr(pf, 'id') else None,
+                            "preset_id": pf.preset_id,
+                            "filter_id": pf.filter_id,
+                            "order": getattr(pf, 'filter_order', 0),  # Utiliser filter_order ou un ordre par défaut
+                            "filter": filter_dict  # Inclure les détails du filtre dans la relation
+                        }
+                        preset_dict["preset_filters"].append(preset_filter_dict)
+            
             result.append({
-                "preset": preset,
+                "target_id": target_id,
+                "preset_id": preset.id,
+                "preset": preset_dict,
                 "is_available": is_available,
-                "required_filters": preset.required_filters
+                "required_filters": preset.get_required_filters()
             })
 
         return result
@@ -310,7 +358,7 @@ class TargetService:
         # Vérifie la disponibilité des filtres requis
         files = await self.target_file_repository.get_by_target(target_id)
         available_filters = {str(f.filter_id) for f in files if f.in_minio}
-        required_filters = preset.required_filters.keys()
+        required_filters = preset.get_required_filters()
 
         is_available = all(filter_id in available_filters for filter_id in required_filters)
 
