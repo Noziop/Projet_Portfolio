@@ -5,13 +5,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.repositories.base_repository import BaseRepository
 from app.infrastructure.repositories.models.preset import Preset
 from uuid import UUID
+from sqlalchemy.orm import selectinload
 
 class PresetRepository(BaseRepository[Preset]):
     def __init__(self, session: AsyncSession):
         super().__init__(Preset, session)
 
     async def get_by_telescope(self, telescope_id: UUID) -> List[Preset]:
-        query = select(Preset).where(Preset.telescope_id == str(telescope_id))
+        """Récupère tous les presets pour un télescope donné avec chargement contrôlé des relations"""
+        query = (
+            select(Preset)
+            .where(Preset.telescope_id == str(telescope_id))
+            .options(
+                selectinload(Preset.telescope)
+            )
+            .order_by(Preset.name)
+        )
         result = await self.session.execute(query)
         return result.scalars().all()
 

@@ -6,13 +6,24 @@ from app.infrastructure.repositories.base_repository import BaseRepository
 from app.infrastructure.repositories.models.filter import Filter
 from app.domain.value_objects.filter_types import FilterType
 from uuid import UUID
+from sqlalchemy.orm import selectinload, load_only
 
 class FilterRepository(BaseRepository[Filter]):
     def __init__(self, session: AsyncSession):
         super().__init__(Filter, session)
 
     async def get_by_telescope(self, telescope_id: UUID) -> List[Filter]:
-        query = select(Filter).where(Filter.telescope_id == str(telescope_id))
+        """Récupère tous les filtres pour un télescope donné avec chargement contrôlé des relations"""
+        # Création de la requête en utilisant joinedload au lieu de selectinload + load_only
+        query = (
+            select(Filter)
+            .where(Filter.telescope_id == str(telescope_id))
+            .options(
+                selectinload(Filter.telescope)
+            )
+            .order_by(Filter.name)
+        )
+        
         result = await self.session.execute(query)
         return result.scalars().all()
 
