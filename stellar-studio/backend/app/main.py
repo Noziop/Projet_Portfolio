@@ -46,6 +46,15 @@ async def root():
 
 @app.on_event("startup")
 async def startup_event():
+    # Initialisation du cache Redis
+    from app.core.cache import get_redis_client
+    logger.info("Initialisation du cache Redis...")
+    redis_client = get_redis_client()
+    if redis_client:
+        logger.info("Cache Redis initialisé avec succès !")
+    else:
+        logger.warning("Impossible d'initialiser le cache Redis, utilisation du fallback en mémoire")
+    
     # Initialisation de la base de données
     logger.info("Initialisation de la base de données...")
     await init_db()
