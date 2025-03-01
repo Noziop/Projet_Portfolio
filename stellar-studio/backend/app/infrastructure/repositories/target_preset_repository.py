@@ -26,6 +26,15 @@ class TargetPresetRepository(BaseRepository[TargetPreset]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    async def get_by_target_and_preset(self, target_id: UUID, preset_id: UUID) -> Optional[TargetPreset]:
+        """Récupère l'association entre une cible et un preset"""
+        query = select(TargetPreset).where(
+            TargetPreset.target_id == str(target_id),
+            TargetPreset.preset_id == str(preset_id)
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
     async def update_availability(self, target_id: UUID, preset_id: UUID, is_available: bool) -> bool:
         """Met à jour la disponibilité d'un preset pour une cible"""
         query = select(TargetPreset).where(

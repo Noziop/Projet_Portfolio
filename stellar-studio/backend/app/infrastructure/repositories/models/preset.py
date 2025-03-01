@@ -152,6 +152,14 @@ class Preset(Base):
         """Retourne les filtres dans l'ordre d'application."""
         return [pf.filter for pf in sorted(self.preset_filters, key=lambda x: x.order)]
 
+    def get_required_filters(self):
+        """
+        Retourne une liste des IDs de filtres requis par ce preset.
+        
+        Format: ["filter_id1", "filter_id2"]
+        """
+        return [str(pf.filter_id) for pf in self.preset_filters]
+
     def add_filter(self, filter_obj, order=None):
         """Ajoute un filtre au preset."""
         from app.infrastructure.repositories.models.preset_filter import PresetFilter
