@@ -1,5 +1,5 @@
 # app/services/auth/service.py
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from uuid import UUID
 from jose import jwt
@@ -49,7 +49,7 @@ class AuthService:
     def create_access_token(self, user_id: UUID) -> str:
         """Crée un JWT token pour l'utilisateur"""
         token_operations.labels(operation='create').inc()
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode = {
             "exp": expire,
             "sub": str(user_id)
@@ -66,7 +66,7 @@ class AuthService:
                 return None, None
 
             # Mise à jour du last_login
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             await self.user_repository.update(user)
 
             # Création de la session avec l'ID utilisateur comme clé
@@ -74,7 +74,7 @@ class AuthService:
                 "email": user.email,
                 "role": user.role.value,
                 "level": user.level.value,
-                "last_login": datetime.utcnow().isoformat()
+                "last_login": datetime.now(timezone.utc).isoformat()
             }
             
             # Crée la session et vérifie le succès
@@ -124,7 +124,7 @@ class AuthService:
             raise ValueError("Invalid session")
             
         # Met à jour la session
-        session["refreshed_at"] = datetime.utcnow().isoformat()
+        session["refreshed_at"] = datetime.now(timezone.utc).isoformat()
         await self.session_service.update_session(user_id, session)
         
         # Crée un nouveau token
