@@ -4,10 +4,13 @@ import logging
 import time
 from typing import Any, Dict, Optional, TypeVar, Generic, List, Union
 from uuid import UUID
+from datetime import datetime, date
 from pydantic import BaseModel
 import redis
 from redis.exceptions import RedisError
 from app.core.config import settings
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from sqlalchemy.orm.collections import InstrumentedList
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +20,39 @@ _redis_client = None
 # Type générique pour les modèles Pydantic
 T = TypeVar('T')
 
-# Classe personnalisée pour l'encodage JSON (pour gérer les UUID)
+# Classe personnalisée pour l'encodage JSON (pour gérer les UUID, datetime et objets SQLAlchemy)
 class UUIDEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, UUID):
             return str(obj)
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
         if isinstance(obj, BaseModel):
             return obj.model_dump()
+        # Gestion des objets SQLAlchemy
+        if hasattr(obj, '__class__') and hasattr(obj.__class__, '__tablename__'):
+            # Convertir l'objet SQLAlchemy en dictionnaire
+            obj_dict = {}
+            for key, value in obj.__dict__.items():
+                if not key.startswith('_'):  # Ignorer les attributs internes
+                    # Gérer les relations (listes, objets imbriqués)
+                    if isinstance(value, InstrumentedList):
+                        # Pour une relation many-to-many, ne garder que les IDs
+                        obj_dict[key] = [item.id if hasattr(item, 'id') else str(item) for item in value]
+                    elif hasattr(value, '__class__') and hasattr(value.__class__, '__tablename__'):
+                        # Pour une relation one-to-one ou many-to-one, juste garder l'ID
+                        obj_dict[key] = str(value.id) if hasattr(value, 'id') else str(value)
+                    else:
+                        obj_dict[key] = value
+            return obj_dict
+        # Gestion des listes instrumentées (relations)
+        if isinstance(obj, InstrumentedList):
+            return [item.id if hasattr(item, 'id') else str(item) for item in obj]
+        # Gestion des dictionnaires contenant des objets complexes
+        if isinstance(obj, dict):
+            # Ne faisons rien ici, laissons json.JSONEncoder traiter les dictionnaires normalement
+            # Les objets complexes seront traités lors de leur sérialisation
+            pass
         return super().default(obj)
 
 # Fonction pour obtenir le client Redis
