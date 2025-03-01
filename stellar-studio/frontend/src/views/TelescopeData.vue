@@ -301,7 +301,7 @@ export default {
           headers['If-None-Match'] = etags.value[`targets_${telescopeId}`]
         }
         
-        const response = await apiClient.get(`/observations/${telescopeId}/targets`, { headers })
+        const response = await apiClient.get(`/targets/?telescope_id=${telescopeId}`, { headers })
         
         // Sauvegarder l'ETag pour les requêtes futures
         if (response.headers.etag) {
