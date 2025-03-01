@@ -100,28 +100,28 @@ class SpaceTelescope(Base):
         "Filter", 
         back_populates="telescope",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
     
     targets = relationship(
         "Target", 
         back_populates="telescope",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
     
     presets = relationship(
         "Preset", 
         back_populates="telescope",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
     
     observations = relationship(
         "Observation", 
         back_populates="telescope",
         cascade="all, delete-orphan",
-        lazy="selectin",
+        lazy="noload",
         order_by="desc(Observation.observation_date)"
     )
     
@@ -129,7 +129,7 @@ class SpaceTelescope(Base):
         "ProcessingJob", 
         back_populates="telescope",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="noload"
     )
 
     # Validateurs
@@ -171,16 +171,35 @@ class SpaceTelescope(Base):
             except json.JSONDecodeError:
                 raise ValueError("La liste des instruments doit être un JSON valide")
         
-        if not isinstance(instruments, list):
-            raise ValueError("Les instruments doivent être une liste")
-            
-        for instrument in instruments:
-            if not isinstance(instrument, dict):
-                raise ValueError("Chaque instrument doit être un objet")
-            if 'name' not in instrument or 'type' not in instrument:
-                raise ValueError("Chaque instrument doit avoir un nom et un type")
+        # Convertir une liste en dictionnaire si nécessaire
+        if isinstance(instruments, list):
+            instruments_dict = {}
+            for instrument in instruments:
+                if not isinstance(instrument, dict):
+                    raise ValueError("Chaque instrument doit être un objet")
+                if 'name' not in instrument or 'type' not in instrument:
+                    raise ValueError("Chaque instrument doit avoir un nom et un type")
+                # Utiliser le nom de l'instrument comme clé
+                instruments_dict[instrument['name']] = {
+                    'name': instrument['name'],
+                    'description': instrument.get('type', ''),  # Utiliser type comme description par défaut
+                    'wavelength_range': instrument.get('wavelength_range', None),
+                    'resolution': instrument.get('resolution', None)
+                }
+            return instruments_dict
                 
-        return instruments
+        # Si c'est déjà un dictionnaire, vérifier sa structure
+        elif isinstance(instruments, dict):
+            for key, instrument in instruments.items():
+                if not isinstance(instrument, dict):
+                    raise ValueError("Chaque instrument doit être un objet")
+                if 'name' not in instrument:
+                    instrument['name'] = key
+                if 'description' not in instrument:
+                    instrument['description'] = instrument.get('type', '')
+            return instruments
+            
+        raise ValueError("Les instruments doivent être une liste ou un dictionnaire")
 
     @validates('api_endpoint')
     def validate_api_endpoint(self, key, url):
