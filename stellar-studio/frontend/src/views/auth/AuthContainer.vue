@@ -10,15 +10,15 @@
         <!-- Panneau de connexion (gauche) -->
         <div class="form-container sign-in-container">
           <form @submit.prevent="handleLogin">
-            <h1>Se connecter</h1>
+            <h1>{{ $t('auth.signin') }}</h1>
             <div class="social-container">
               <v-btn icon="mdi-facebook" variant="text" class="social-btn" />
               <v-btn icon="mdi-linkedin" variant="text" class="social-btn" />
             </div>
-            <span>ou utilisez votre compte</span>
+            <span>{{ $t('auth.orUseAccount') }}</span>
             <v-text-field
               v-model="loginForm.username"
-              label="Email"
+              :label="$t('auth.email')"
               variant="underlined"
               color="pink-accent-2"
               bg-color="transparent"
@@ -26,29 +26,29 @@
             />
             <v-text-field
               v-model="loginForm.password"
-              label="Mot de passe"
+              :label="$t('auth.password')"
               variant="underlined"
               type="password"
               color="pink-accent-2"
               bg-color="transparent"
               class="input-field"
             />
-            <button type="submit" class="submit-btn">Se connecter</button>
+            <button type="submit" class="submit-btn">{{ $t('auth.login') }}</button>
           </form>
         </div>
 
         <!-- Panneau d'inscription -->
         <div class="form-container sign-up-container">
           <form @submit.prevent="handleRegister">
-            <h1>Créer un compte</h1>
+            <h1>{{ $t('auth.createAccount') }}</h1>
             <div class="social-container">
               <v-btn icon="mdi-facebook" variant="text" class="social-btn" />
               <v-btn icon="mdi-linkedin" variant="text" class="social-btn" />
             </div>
-            <span>ou utilisez votre email</span>
+            <span>{{ $t('auth.orUseEmail') }}</span>
             <v-text-field
               v-model="registerForm.username"
-              label="Nom"
+              :label="$t('auth.name')"
               variant="underlined"
               color="pink-accent-2"
               bg-color="transparent"
@@ -56,7 +56,7 @@
             />
             <v-text-field
               v-model="registerForm.email"
-              label="Email"
+              :label="$t('auth.email')"
               variant="underlined"
               color="pink-accent-2"
               bg-color="transparent"
@@ -64,14 +64,14 @@
             />
             <v-text-field
               v-model="registerForm.password"
-              label="Mot de passe"
+              :label="$t('auth.password')"
               variant="underlined"
               type="password"
               color="pink-accent-2"
               bg-color="transparent"
               class="input-field"
             />
-            <button type="submit" class="submit-btn">S'inscrire</button>
+            <button type="submit" class="submit-btn">{{ $t('auth.register') }}</button>
           </form>
         </div>
 
@@ -79,14 +79,14 @@
         <div class="overlay-container">
           <div class="overlay">
             <div class="overlay-panel overlay-left">
-              <h1>Content de vous revoir !</h1>
-              <p>Connectez-vous pour continuer votre voyage parmi les étoiles</p>
-              <button class="ghost" @click="isPanelActive = false">Se connecter</button>
+              <h1>{{ $t('auth.welcomeBack') }}</h1>
+              <p>{{ $t('auth.loginToContinue') }}</p>
+              <button class="ghost" @click="isPanelActive = false">{{ $t('auth.login') }}</button>
             </div>
             <div class="overlay-panel overlay-right">
-              <h1>Bienvenue, Astronaute !</h1>
-              <p>Embarquez pour un voyage spatial en créant votre compte</p>
-              <button class="ghost" @click="isPanelActive = true">S'inscrire</button>
+              <h1>{{ $t('auth.helloAstronaut') }}</h1>
+              <p>{{ $t('auth.registerToJourney') }}</p>
+              <button class="ghost" @click="isPanelActive = true">{{ $t('auth.register') }}</button>
             </div>
           </div>
         </div>
@@ -102,7 +102,7 @@
         {{ snackbar.text }}
         <template v-slot:actions>
           <v-btn variant="text" @click="snackbar.show = false">
-            Fermer
+            {{ $t('common.close') }}
           </v-btn>
         </template>
       </v-snackbar>
@@ -133,6 +133,17 @@ export default {
     const formOpacity = ref(0)
 
     onMounted(() => {
+      // Vérifier si un mode est spécifié dans l'URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode');
+      
+      if (mode === 'register') {
+        isPanelActive.value = true;
+      } else {
+        isPanelActive.value = false;
+      }
+      
+      // Afficher le formulaire avec une légère animation
       setTimeout(() => {
         showForm.value = true
         setTimeout(() => {
@@ -178,7 +189,7 @@ export default {
 
     async handleLogin() {
       if (!this.loginForm.username || !this.loginForm.password) {
-        this.showNotification('Veuillez remplir tous les champs', 'error')
+        this.showNotification(this.$t('auth.errors.fillAllFields'), 'error')
         return
       }
       
@@ -187,7 +198,7 @@ export default {
         await this.authStore.login(this.loginForm.username, this.loginForm.password)
         this.$router.push('/')
       } catch (error) {
-        this.showNotification(error.response?.data?.detail || 'Erreur de connexion', 'error')
+        this.showNotification(error.response?.data?.detail || this.$t('auth.errors.loginError'), 'error')
       } finally {
         this.loading = false
       }
@@ -195,20 +206,20 @@ export default {
 
     async handleRegister() {
       if (!this.registerForm.username || !this.registerForm.email || !this.registerForm.password) {
-        this.showNotification('Veuillez remplir tous les champs', 'error')
+        this.showNotification(this.$t('auth.errors.fillAllFields'), 'error')
         return
       }
       
       this.loading = true
       try {
         await this.authStore.register(this.registerForm)
-        this.showNotification('Compte créé avec succès ! Vous pouvez maintenant vous connecter.')
+        this.showNotification(this.$t('auth.accountCreated'))
         setTimeout(() => {
           this.isPanelActive = false
         }, 1000)
       } catch (error) {
         this.showNotification(
-          error.response?.data?.detail || 'Erreur lors de l\'inscription',
+          error.response?.data?.detail || this.$t('auth.errors.registerError'),
           'error'
         )
       } finally {

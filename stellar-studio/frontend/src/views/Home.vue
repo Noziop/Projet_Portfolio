@@ -5,9 +5,9 @@
     <v-container class="content-overlay">
       <v-row justify="center" align="center" class="text-center">
         <v-col cols="12">
-          <h1 class="text-h2 mb-6 stellar-title">Welcome to Stellar Studio</h1>
+          <h1 class="text-h2 mb-6 stellar-title">{{ $t('home.welcome') }}</h1>
           <p class="text-h5 mb-10 stellar-subtitle">
-            {{ isAuthenticated ? 'Your Advanced Astrophotography Processing Platform' : 'Sign in to start processing your astronomical images' }}
+            {{ isAuthenticated ? $t('home.subtitle.auth') : $t('home.subtitle.nonAuth') }}
           </p>
         </v-col>
       </v-row>
@@ -17,10 +17,10 @@
           <v-card class="feature-card mx-auto" max-width="400">
             <v-card-title>
               <v-icon start icon="mdi-telescope" class="mr-2"></v-icon>
-              Telescope Data
+              {{ $t('home.features.telescope.title') }}
             </v-card-title>
             <v-card-text>
-              Access data from HST and JWST telescopes directly through our platform.
+              {{ $t('home.features.telescope.description') }}
             </v-card-text>
             <v-card-actions>
               <v-btn
@@ -28,7 +28,7 @@
                 variant="tonal"
                 @click="$router.push('/telescopes')"
               >
-                Browse Telescopes
+                {{ $t('home.features.telescope.button') }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -38,10 +38,10 @@
           <v-card class="feature-card mx-auto" max-width="400">
             <v-card-title>
               <v-icon start icon="mdi-image-filter" class="mr-2"></v-icon>
-              Processing Tools
+              {{ $t('home.features.processing.title') }}
             </v-card-title>
             <v-card-text>
-              Advanced image processing tools specifically designed for astrophotography.
+              {{ $t('home.features.processing.description') }}
             </v-card-text>
             <v-card-actions>
               <v-btn
@@ -49,7 +49,7 @@
                 variant="tonal"
                 @click="$router.push('/processing')"
               >
-                Start Processing
+                {{ $t('home.features.processing.button') }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -59,10 +59,10 @@
           <v-card class="feature-card mx-auto" max-width="400">
             <v-card-title>
               <v-icon start icon="mdi-book-open-variant" class="mr-2"></v-icon>
-              Documentation
+              {{ $t('home.features.docs.title') }}
             </v-card-title>
             <v-card-text>
-              Comprehensive guides and tutorials to help you get started.
+              {{ $t('home.features.docs.description') }}
             </v-card-text>
             <v-card-actions>
               <v-btn
@@ -70,7 +70,7 @@
                 variant="tonal"
                 @click="$router.push('/docs')"
               >
-                Read Docs
+                {{ $t('home.features.docs.button') }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -83,17 +83,17 @@
             color="pink-accent-2"
             size="x-large"
             class="auth-btn mx-2"
-            @click="$router.push('/auth')"
+            to="/auth?mode=login"
           >
-            Login
+            {{ $t('auth.login') }}
           </v-btn>
           <v-btn
             color="cyan-accent-2"
             size="x-large"
             class="auth-btn mx-2"
-            @click="$router.push('/auth')"
+            to="/auth?mode=register"
           >
-            Register
+            {{ $t('auth.register') }}
           </v-btn>
         </v-col>
       </v-row>

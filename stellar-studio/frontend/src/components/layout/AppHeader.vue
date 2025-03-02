@@ -8,16 +8,28 @@
       </v-app-bar-title>
   
       <v-spacer></v-spacer>
+      
+      <!-- Sélecteur de langue -->
+      <v-btn-toggle
+        v-model="currentLocale"
+        mandatory
+        class="mx-4"
+        density="comfortable"
+        @update:model-value="changeLocale"
+      >
+        <v-btn value="fr" variant="text">FR</v-btn>
+        <v-btn value="en" variant="text">EN</v-btn>
+      </v-btn-toggle>
   
       <!-- Menu pour utilisateurs non authentifiés -->
       <template v-if="!isAuthenticated">
-        <v-btn to="/auth" text>
+        <v-btn to="/auth?mode=login" text>
           <v-icon start>mdi-login</v-icon>
-          Login
+          {{ $t('auth.login') }}
         </v-btn>
-        <v-btn to="/auth" text>
+        <v-btn to="/auth?mode=register" text>
           <v-icon start>mdi-account-plus</v-icon>
-          Register
+          {{ $t('auth.register') }}
         </v-btn>
       </template>
   
@@ -25,11 +37,11 @@
       <template v-else>
         <v-btn to="/" text>
           <v-icon start>mdi-home</v-icon>
-          Home
+          {{ $t('navigation.home') }}
         </v-btn>
         <v-btn to="/processing" text>
           <v-icon start>mdi-image-filter</v-icon>
-          Processing
+          {{ $t('navigation.processing') }}
         </v-btn>
         
         <!-- Menu utilisateur -->
@@ -53,7 +65,7 @@
               <template v-slot:prepend>
                 <v-icon>mdi-logout</v-icon>
               </template>
-              <v-list-item-title>Logout</v-list-item-title>
+              <v-list-item-title>{{ $t('auth.logout') }}</v-list-item-title>
             </v-list-item>
           </v-list>
         </v-menu>
@@ -64,6 +76,8 @@
   <script>
   import { useAuthStore } from '../../stores/auth'
   import { storeToRefs } from 'pinia'
+  import { getCurrentInstance, ref } from 'vue'
+  import { useRouter } from 'vue-router'
   
   export default {
     name: 'AppHeader',
@@ -73,27 +87,51 @@
     setup(props, { emit }) {
       const authStore = useAuthStore()
       const { isAuthenticated, user } = storeToRefs(authStore)
+      const instance = getCurrentInstance()
+      const router = useRouter()
+      
+      // Référence réactive pour la locale courante
+      const currentLocale = ref(localStorage.getItem('locale') || 'fr')
+      
+      // Fonction pour changer la langue
+      const changeLocale = (newLocale) => {
+        if (instance && instance.proxy.$setLocale) {
+          instance.proxy.$setLocale(newLocale)
+          currentLocale.value = newLocale
+        }
+      }
   
       const handleLogout = async () => {
         try {
           authStore.logout()
+          
+          // Utilisation de i18n pour les messages
+          const message = instance?.proxy?.$t('auth.logoutSuccess') || 'Successfully logged out'
+          
           emit('show-notification', {
-            text: 'Successfully logged out',
+            text: message,
             color: 'success'
           })
+          
           router.push('/auth')
         } catch (error) {
+          // Utilisation de i18n pour les messages d'erreur
+          const errorMessage = instance?.proxy?.$t('auth.logoutError') || 'Error during logout'
+          
           emit('show-notification', {
-            text: 'Error during logout',
+            text: errorMessage,
             color: 'error'
           })
+          console.error("Erreur lors de la déconnexion:", error)
         }
       }
   
       return { 
         isAuthenticated,
         user,
-        handleLogout
+        handleLogout,
+        currentLocale,
+        changeLocale
       }
     }
   }

@@ -1,0 +1,83 @@
+{
+  "home": {
+    "welcome": "Bienvenue sur Stellar Studio",
+    "subtitle": {
+      "auth": "Votre plateforme avancée de traitement d'astrophotographie",
+      "nonAuth": "Connectez-vous pour commencer à traiter vos images astronomiques"
+    },
+    "cta": {
+      "login": "Se connecter",
+      "register": "Créer un compte"
+    },
+    "features": {
+      "telescope": {
+        "title": "Données Télescopiques",
+        "description": "Accédez aux données des télescopes HST et JWST directement depuis notre plateforme.",
+        "button": "Explorer"
+      },
+      "processing": {
+        "title": "Outils de Traitement",
+        "description": "Outils de traitement d'images avancés spécifiquement conçus pour l'astrophotographie.",
+        "button": "Commencer le traitement"
+      },
+      "docs": {
+        "title": "Documentation",
+        "description": "Guides complets et tutoriels pour vous aider à démarrer.",
+        "button": "Lire la documentation"
+      }
+    }
+  },
+  "auth": {
+    "login": "Se connecter",
+    "register": "S'inscrire",
+    "logout": "Déconnexion",
+    "logoutSuccess": "Déconnexion réussie !",
+    "logoutError": "Erreur lors de la déconnexion",
+    "loginSuccess": "Connexion réussie !",
+    "loginError": "Erreur de connexion",
+    "registerSuccess": "Compte créé avec succès !",
+    "registerError": "Erreur lors de l'inscription",
+    "email": "Email",
+    "password": "Mot de passe",
+    "username": "Nom d'utilisateur",
+    "name": "Nom",
+    "orUseSocial": "ou utilisez les réseaux sociaux",
+    "orUseEmail": "ou utilisez votre email",
+    "orUseAccount": "ou utilisez votre compte",
+    "signin": "Se connecter",
+    "createAccount": "Créer un compte",
+    "welcomeBack": "Content de vous revoir !",
+    "welcomeNew": "Bienvenue, Astronaute !",
+    "helloAstronaut": "Bienvenue, Astronaute !",
+    "loginToContinue": "Connectez-vous pour continuer votre voyage parmi les étoiles",
+    "registerToJourney": "Embarquez pour un voyage spatial en créant votre compte",
+    "continueJourney": "Connectez-vous pour continuer votre voyage parmi les étoiles",
+    "startJourney": "Embarquez pour un voyage spatial en créant votre compte",
+    "accountCreated": "Compte créé avec succès ! Vous pouvez maintenant vous connecter.",
+    "errors": {
+      "fillAllFields": "Veuillez remplir tous les champs",
+      "loginError": "Erreur de connexion",
+      "registerError": "Erreur lors de l'inscription"
+    }
+  },
+  "common": {
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "submit": "Soumettre",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "error": "Erreur",
+    "success": "Succès",
+    "loading": "Chargement..."
+  },
+  "navigation": {
+    "home": "Accueil",
+    "processing": "Traitement",
+    "telescopes": "Télescopes",
+    "gallery": "Galerie",
+    "docs": "Documentation",
+    "account": "Mon compte",
+    "settings": "Paramètres"
+  }
+} 

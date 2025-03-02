@@ -1,0 +1,83 @@
+{
+  "home": {
+    "welcome": "Welcome to Stellar Studio",
+    "subtitle": {
+      "auth": "Your Advanced Astrophotography Processing Platform",
+      "nonAuth": "Sign in to start processing your astronomical images"
+    },
+    "cta": {
+      "login": "Login",
+      "register": "Register"
+    },
+    "features": {
+      "telescope": {
+        "title": "Telescope Data",
+        "description": "Access data from HST and JWST telescopes directly through our platform.",
+        "button": "Explore"
+      },
+      "processing": {
+        "title": "Processing Tools",
+        "description": "Advanced image processing tools specifically designed for astrophotography.",
+        "button": "Start Processing"
+      },
+      "docs": {
+        "title": "Documentation",
+        "description": "Comprehensive guides and tutorials to help you get started.",
+        "button": "Read Docs"
+      }
+    }
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "logoutSuccess": "Successfully logged out",
+    "logoutError": "Error during logout",
+    "loginSuccess": "Successfully logged in",
+    "loginError": "Login error",
+    "registerSuccess": "Account successfully created!",
+    "registerError": "Error during registration",
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "name": "Name",
+    "orUseSocial": "or use social media",
+    "orUseEmail": "or use your email",
+    "orUseAccount": "or use your account",
+    "signin": "Sign In",
+    "createAccount": "Create Account",
+    "welcomeBack": "Welcome Back!",
+    "welcomeNew": "Welcome, Astronaut!",
+    "helloAstronaut": "Welcome, Astronaut!",
+    "loginToContinue": "Sign in to continue your journey among the stars",
+    "registerToJourney": "Embark on a space journey by creating your account",
+    "continueJourney": "Sign in to continue your journey among the stars",
+    "startJourney": "Embark on a space journey by creating your account",
+    "accountCreated": "Account successfully created! You can now login.",
+    "errors": {
+      "fillAllFields": "Please fill in all fields",
+      "loginError": "Login error",
+      "registerError": "Registration error"
+    }
+  },
+  "common": {
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "edit": "Edit",
+    "delete": "Delete",
+    "error": "Error",
+    "success": "Success",
+    "loading": "Loading..."
+  },
+  "navigation": {
+    "home": "Home",
+    "processing": "Processing",
+    "telescopes": "Telescopes",
+    "gallery": "Gallery",
+    "docs": "Documentation",
+    "account": "My Account",
+    "settings": "Settings"
+  }
+} 
