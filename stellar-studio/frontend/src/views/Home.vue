@@ -1,7 +1,8 @@
 <template>
   <default-layout>
-    <animated-stars :star-count="800" />
+    <animated-stars :star-count="2000" />
     <nebula-effect />
+    <lightspeed-transition ref="lightspeedTransition" />
     <v-container class="content-overlay">
       <v-row justify="center" align="center" class="text-center">
         <v-col cols="12">
@@ -13,64 +14,22 @@
       </v-row>
 
       <v-row v-if="isAuthenticated">
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="4" v-for="(feature, index) in features" :key="index">
           <v-card class="feature-card mx-auto" max-width="400">
             <v-card-title>
-              <v-icon start icon="mdi-telescope" class="mr-2"></v-icon>
-              {{ $t('home.features.telescope.title') }}
+              <v-icon start :icon="feature.icon" class="mr-2"></v-icon>
+              {{ $t(feature.title) }}
             </v-card-title>
             <v-card-text>
-              {{ $t('home.features.telescope.description') }}
+              {{ $t(feature.description) }}
             </v-card-text>
             <v-card-actions>
               <v-btn
                 color="pink-accent-2"
                 variant="tonal"
-                @click="$router.push('/telescopes')"
+                @click="navigateWithLightspeed(feature.route)"
               >
-                {{ $t('home.features.telescope.button') }}
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-col>
-
-        <v-col cols="12" md="4">
-          <v-card class="feature-card mx-auto" max-width="400">
-            <v-card-title>
-              <v-icon start icon="mdi-image-filter" class="mr-2"></v-icon>
-              {{ $t('home.features.processing.title') }}
-            </v-card-title>
-            <v-card-text>
-              {{ $t('home.features.processing.description') }}
-            </v-card-text>
-            <v-card-actions>
-              <v-btn
-                color="pink-accent-2"
-                variant="tonal"
-                @click="$router.push('/processing')"
-              >
-                {{ $t('home.features.processing.button') }}
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-col>
-
-        <v-col cols="12" md="4">
-          <v-card class="feature-card mx-auto" max-width="400">
-            <v-card-title>
-              <v-icon start icon="mdi-book-open-variant" class="mr-2"></v-icon>
-              {{ $t('home.features.docs.title') }}
-            </v-card-title>
-            <v-card-text>
-              {{ $t('home.features.docs.description') }}
-            </v-card-text>
-            <v-card-actions>
-              <v-btn
-                color="pink-accent-2"
-                variant="tonal"
-                @click="$router.push('/docs')"
-              >
-                {{ $t('home.features.docs.button') }}
+                {{ $t(feature.button) }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -83,7 +42,7 @@
             color="pink-accent-2"
             size="x-large"
             class="auth-btn mx-2"
-            to="/auth?mode=login"
+            @click="navigateWithLightspeed('/auth?mode=login')"
           >
             {{ $t('auth.login') }}
           </v-btn>
@@ -91,7 +50,7 @@
             color="cyan-accent-2"
             size="x-large"
             class="auth-btn mx-2"
-            to="/auth?mode=register"
+            @click="navigateWithLightspeed('/auth?mode=register')"
           >
             {{ $t('auth.register') }}
           </v-btn>
@@ -102,9 +61,12 @@
 </template>
 
 <script>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import DefaultLayout from '../layouts/DefaultLayout.vue'
 import AnimatedStars from '../components/AnimatedStars.vue'
 import NebulaEffect from '../components/NebulaEffect.vue'
+import LightspeedTransition from '../components/LightspeedTransition.vue'
 import { useAuthStore } from '../stores/auth'
 import { storeToRefs } from 'pinia'
 
@@ -113,13 +75,53 @@ export default {
   components: {
     DefaultLayout,
     AnimatedStars,
-    NebulaEffect
+    NebulaEffect,
+    LightspeedTransition
   },
 
   setup() {
     const authStore = useAuthStore()
     const { isAuthenticated } = storeToRefs(authStore)
-    return { isAuthenticated }
+    const router = useRouter()
+    const lightspeedTransition = ref(null)
+
+    const features = [
+      {
+        icon: 'mdi-telescope',
+        title: 'home.features.telescope.title',
+        description: 'home.features.telescope.description',
+        button: 'home.features.telescope.button',
+        route: '/telescopes'
+      },
+      {
+        icon: 'mdi-image-filter',
+        title: 'home.features.processing.title',
+        description: 'home.features.processing.description',
+        button: 'home.features.processing.button',
+        route: '/processing'
+      },
+      {
+        icon: 'mdi-book-open-variant',
+        title: 'home.features.docs.title',
+        description: 'home.features.docs.description',
+        button: 'home.features.docs.button',
+        route: '/docs'
+      }
+    ]
+
+    const navigateWithLightspeed = (route) => {
+      lightspeedTransition.value.activate()
+      setTimeout(() => {
+        router.push(route)
+      }, 500) // Attendre la moitié de l'animation avant de changer de page
+    }
+
+    return { 
+      isAuthenticated, 
+      lightspeedTransition, 
+      navigateWithLightspeed,
+      features
+    }
   }
 }
 </script>

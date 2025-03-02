@@ -15,6 +15,7 @@
     "simplex-noise": "4.0.3",
     "three": "^0.158.0",
     "vue": "^3.3.8",
+    "vue-glitch": "^1.0.1",
     "vue-i18n": "^11.0.0-rc.1",
     "vue-router": "^4.2.0",
     "vuetify": "^3.4.0"

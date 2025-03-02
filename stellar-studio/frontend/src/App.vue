@@ -1,6 +1,9 @@
 <template>
   <v-app>
     <v-theme-provider :theme="theme">
+      <!-- Transition Lightspeed -->
+      <lightspeed-transition :active="isTransitioning" @transitionend="onTransitionEnd" />
+
       <!-- Loading Overlay -->
       <v-overlay
         :model-value="isLoading"
@@ -13,8 +16,12 @@
         ></v-progress-circular>
       </v-overlay>
 
-      <!-- Main Content -->
-      <router-view></router-view>
+      <!-- Main Content with Transition -->
+      <router-view v-slot="{ Component }">
+        <transition :name="transitionName" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
 
       <!-- Global Error Snackbar -->
       <v-snackbar
@@ -41,14 +48,46 @@
 <script>
 import { useImageStore } from './stores/images'
 import { storeToRefs } from 'pinia'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import LightspeedTransition from './components/LightspeedTransition.vue'
 
 export default {
   name: 'App',
+  components: {
+    LightspeedTransition,
+  },
   
   setup() {
     const imageStore = useImageStore()
     const { isLoading, error } = storeToRefs(imageStore)
-    return { imageStore, isLoading, error }
+    const router = useRouter()
+
+    // Gestion des transitions
+    const isTransitioning = ref(false)
+    const transitionName = ref('')
+
+    watch(() => router.currentRoute.value, (to, from) => {
+      if (to.meta.transition === 'lightspeed' && from.meta.transition === 'lightspeed') {
+        isTransitioning.value = true
+        transitionName.value = 'lightspeed'
+      } else {
+        transitionName.value = 'fade'
+      }
+    })
+
+    const onTransitionEnd = () => {
+      isTransitioning.value = false
+    }
+
+    return { 
+      imageStore, 
+      isLoading, 
+      error, 
+      isTransitioning, 
+      transitionName, 
+      onTransitionEnd 
+    }
   },
 
   data() {
@@ -78,6 +117,29 @@ export default {
 </script>
 
 <style>
+/* Styles pour les transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.lightspeed-enter-active,
+.lightspeed-leave-active {
+  transition: all 0.5s ease;
+}
+
+.lightspeed-enter-from,
+.lightspeed-leave-to {
+  opacity: 0;
+  transform: scale(1.5);
+}
+
+/* Autres styles globaux */
 :root {
   --primary-color: #1976D2;
   --secondary-color: #424242;

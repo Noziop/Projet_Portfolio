@@ -9,25 +9,26 @@ const routes = [
   {
     path: '/',
     name: 'Home',
-    component: Home
+    component: Home,
+    meta: { transition: 'lightspeed' }
   },
   {
     path: '/processing',
     name: 'Processing',
     component: Processing,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, transition: 'lightspeed' }
   },
   {
     path: '/telescopes',
     name: 'TelescopeData',
     component: TelescopeData,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, transition: 'lightspeed' }
   },  
   {
     path: '/auth',
     name: 'Auth',
     component: AuthContainer,
-    meta: { requiresUnauth: true }  // Empêche l'accès si déjà authentifié
+    meta: { requiresUnauth: true, transition: 'lightspeed' }
   }
 ]
 

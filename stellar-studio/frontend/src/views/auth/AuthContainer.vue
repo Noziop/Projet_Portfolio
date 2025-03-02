@@ -2,6 +2,7 @@
   <default-layout>
     <animated-stars :star-count="800" />
     <nebula-effect />
+    <lightspeed-transition ref="lightspeedTransition" />
     <v-container fluid class="auth-page">
       <div :class="['container', { 'panel-active': isPanelActive }]" 
            v-show="showForm"
@@ -113,9 +114,11 @@
 <script>
 import { useAuthStore } from '../../stores/auth'
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import DefaultLayout from '../../layouts/DefaultLayout.vue'
 import AnimatedStars from '../../components/AnimatedStars.vue'
 import NebulaEffect from '../../components/NebulaEffect.vue'
+import LightspeedTransition from '../../components/LightspeedTransition.vue'
 
 export default {
   name: 'AuthContainer',
@@ -123,17 +126,26 @@ export default {
   components: {
     DefaultLayout,
     AnimatedStars,
-    NebulaEffect
+    NebulaEffect,
+    LightspeedTransition
   },
 
   setup() {
     const authStore = useAuthStore()
+    const router = useRouter()
     const isPanelActive = ref(false)
     const showForm = ref(false)
     const formOpacity = ref(0)
+    const lightspeedTransition = ref(null)
+
+    const navigateWithLightspeed = (route) => {
+      lightspeedTransition.value.activate()
+      setTimeout(() => {
+        router.push(route)
+      }, 500)
+    }
 
     onMounted(() => {
-      // Vérifier si un mode est spécifié dans l'URL
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode');
       
@@ -143,7 +155,6 @@ export default {
         isPanelActive.value = false;
       }
       
-      // Afficher le formulaire avec une légère animation
       setTimeout(() => {
         showForm.value = true
         setTimeout(() => {
@@ -156,7 +167,9 @@ export default {
       isPanelActive,
       authStore,
       showForm,
-      formOpacity
+      formOpacity,
+      lightspeedTransition,
+      navigateWithLightspeed
     }
   },
 
@@ -196,7 +209,7 @@ export default {
       this.loading = true
       try {
         await this.authStore.login(this.loginForm.username, this.loginForm.password)
-        this.$router.push('/')
+        this.navigateWithLightspeed('/')
       } catch (error) {
         this.showNotification(error.response?.data?.detail || this.$t('auth.errors.loginError'), 'error')
       } finally {
@@ -216,6 +229,7 @@ export default {
         this.showNotification(this.$t('auth.accountCreated'))
         setTimeout(() => {
           this.isPanelActive = false
+          this.navigateWithLightspeed('/')
         }, 1000)
       } catch (error) {
         this.showNotification(

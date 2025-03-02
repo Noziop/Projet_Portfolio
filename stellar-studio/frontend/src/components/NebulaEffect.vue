@@ -53,7 +53,7 @@
       
       // Variation de couleur avec transition plus douce
       const colorPhase = (y / size) * Math.PI
-      const edgeColorFactor = Math.pow(edgeFactor, 0.5) // Transition plus progressive des couleurs
+      const edgeColorFactor = Math.pow(edgeFactor, 1) // Transition plus progressive des couleurs
 
       data[i] = noiseValue * (300 * Math.sin(colorPhase)) * edgeColorFactor
       data[i + 1] = noiseValue * (150 * Math.cos(colorPhase)) * edgeColorFactor
@@ -83,19 +83,19 @@
         nebulaRef.value.appendChild(renderer.domElement)
   
         // Création de plusieurs plans de nébuleuse
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 6; i++) {
           const geometry = new THREE.PlaneGeometry(2000, 2000)
           const material = new THREE.MeshBasicMaterial({
             map: createNebulaTexture(),
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            opacity: 0.4, // Augmenté de 0.2 à 0.4
+            opacity: 0.6, // Augmenté de 0.2 à 0.4
             side: THREE.DoubleSide
           })
   
           const mesh = new THREE.Mesh(geometry, material)
-          mesh.position.z = -500 - (i * 200)
+          mesh.position.z = -500 - (i * 175)
           mesh.rotation.z = Math.random() * Math.PI
           scene.add(mesh)
         }
