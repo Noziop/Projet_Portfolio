@@ -1,6 +1,11 @@
 # TODO List - Stellar Studio
 
 ## 🔥 Priorité Haute (Bloquant pour la démo)
+- [ ] **Endpoint de Download**
+  - Créer un endpoint `/tasks/download` dédié
+  - Intégrer avec le service de téléchargement
+  - Assurer la cohérence avec le frontend
+
 - [ ] **Gestion des tâches Celery**
   - Résoudre la double déclaration des tâches (tasks/ et core/tasks.py)
   - Standardiser les noms des tâches
