@@ -7,11 +7,11 @@ export default defineConfig({
     port: 8080,
     host: true,
     proxy: {
-      '/api': {
-        target: 'http://backend:8000',
+      '/api/v1': {
+        target: 'https://api.stellarstudio.fassih.ch',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, '/api')  // Garde le préfixe /api
+        secure: true,
+        rewrite: (path) => path  // Ne pas modifier le chemin
       }
     }
   }
