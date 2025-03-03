@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_db, get_current_user, get_session_service
+from app.api.deps import get_db, get_current_user
 from app.services.workflow.service import WorkflowService
 from app.core.ws.manager import ConnectionManager
 from app.schemas.task import TaskResponse, DownloadTaskCreate, DownloadTaskResponse

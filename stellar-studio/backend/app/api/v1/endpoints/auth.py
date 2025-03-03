@@ -50,11 +50,25 @@ async def login(
             detail="Identifiants incorrects"
         )
     
+    # Sérialiser manuellement l'utilisateur pour éviter la récursion
+    user_dict = {
+        "id": str(user.id),
+        "email": user.email,
+        "username": user.username,
+        "firstname": user.firstname,
+        "lastname": user.lastname,
+        "role": user.role.value if user.role else None,
+        "level": user.level.value if user.level else None,
+        "is_active": user.is_active,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None
+    }
+    
     return {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user": user
+        "user": user_dict
     }
 
 @router.get("/me", response_model=UserResponse)
