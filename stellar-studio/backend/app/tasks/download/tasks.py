@@ -29,13 +29,6 @@ async def get_services():
         finally:
             await session.close()
 
-@shared_task(
-    name="download_mast_files",
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    max_retries=3
-)
 async def download_mast_files(self, task_id: str, target_id: str, preset_id: str):
     """Télécharge les fichiers FITS depuis MAST"""
     async with get_services() as (storage_service, target_service):

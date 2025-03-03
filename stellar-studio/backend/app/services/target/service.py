@@ -31,6 +31,7 @@ from app.domain.value_objects.task_types import TaskType, TaskStatus
 
 from app.services.storage.service import StorageService
 from app.tasks.download.tasks import download_mast_files
+from app.tasks.processing.tasks import process_hoo_preset, generate_channel_previews, wait_user_validation
 
 # Métriques Prometheus
 target_operations = Counter(
@@ -142,12 +143,16 @@ class TargetService:
                 create_download_started_event(str(target_id))
             )
 
-            # Lancement de la tâche Celery
-            download_mast_files.delay(
-                str(task.id),
-                str(target_id),
-                str(preset_id)
+            # Chaînage des tâches Celery : téléchargement suivi de la génération des previews
+            task_chain = chain(
+                download_mast_files.s(
+                    str(task.id),
+                    str(target_id),
+                    str(preset_id)
+                ),
+                generate_channel_previews.s()  # Génère une preview pour chaque canal
             )
+            task_chain.delay()
 
             active_downloads.inc()
             target_operations.labels(operation='download_start', status='success').inc()

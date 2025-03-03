@@ -5,10 +5,33 @@ from app.core.celery import celery_app
 from app.tasks.download.tasks import download_mast_files
 from app.tasks.processing.tasks import process_hoo_preset, generate_channel_previews, wait_user_validation
 
-# Enregistrement explicite des tâches avec leurs noms complets
-celery_app.task(name='app.tasks.download.tasks.download_mast_files')(download_mast_files)
-celery_app.task(name='app.tasks.processing.tasks.process_hoo_preset')(process_hoo_preset)
-celery_app.task(name='generate_channel_previews')(generate_channel_previews)
-celery_app.task(name='wait_user_validation')(wait_user_validation)
+# Configuration commune pour toutes les tâches
+common_options = {
+    "bind": True,
+    "autoretry_for": (Exception,),
+    "retry_backoff": True,
+    "max_retries": 3
+}
+
+# Enregistrement explicite des tâches avec leurs noms complets et options standardisées
+celery_app.task(
+    name='app.tasks.download.download_mast_files',
+    **common_options
+)(download_mast_files)
+
+celery_app.task(
+    name='app.tasks.processing.process_hoo_preset',
+    **common_options
+)(process_hoo_preset)
+
+celery_app.task(
+    name='app.tasks.processing.generate_channel_previews',
+    **common_options
+)(generate_channel_previews)
+
+celery_app.task(
+    name='app.tasks.processing.wait_user_validation',
+    **common_options
+)(wait_user_validation)
 
 # Autres tâches à ajouter selon les besoins

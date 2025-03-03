@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from uuid import UUID
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, UUID4
 from app.domain.value_objects.task_types import TaskType, TaskStatus
 
 class TaskParams(BaseModel):
@@ -92,3 +92,14 @@ class TaskListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+class DownloadTaskCreate(BaseModel):
+    """Schéma pour la création d'une tâche de téléchargement"""
+    target_id: UUID4
+    preset_id: UUID4
+
+class DownloadTaskResponse(BaseModel):
+    """Schéma pour la réponse d'une tâche de téléchargement"""
+    task_id: UUID4
+    status: str
+    message: str = "Téléchargement initié"

@@ -13,14 +13,58 @@ from app.core.ws.manager import ConnectionManager
 # Singleton pour le WebSocket manager
 ws_manager = ConnectionManager()
 
-def apply_stf(data: np.ndarray) -> np.ndarray:
-    """Applique une STF basique à un canal"""
+def auto_stf(data: np.ndarray, target_background: float = 0.25, shadow_protection: float = 0.0, tolerance: float = 0.0015) -> np.ndarray:
+    """
+    Implémente une version de l'AutoSTF inspirée de PixInsight.
+    
+    Args:
+        data: L'image d'entrée en numpy array
+        target_background: Niveau cible pour le fond de ciel (0.25 = 25%)
+        shadow_protection: Protection des ombres (0-1)
+        tolerance: Tolérance pour la convergence
+        
+    Returns:
+        Image étirée
+    """
+    # 1. Calcul des statistiques robustes
     median = np.median(data)
     mad = np.median(np.abs(data - median))
-    shadows = median - 2.8 * mad
-    highlights = median + 8 * mad
-    stretched = (data - shadows) / (highlights - shadows)
+    
+    # 2. Estimation du bruit
+    noise = 1.4826 * mad  # Estimation robuste de l'écart-type
+    
+    # 3. Détection du fond de ciel (background)
+    # Utilise une approche itérative pour trouver le mode
+    hist, bins = np.histogram(data, bins=1000)
+    peak_idx = np.argmax(hist)
+    background = (bins[peak_idx] + bins[peak_idx + 1]) / 2
+    
+    # 4. Détection des pixels significatifs
+    # Pixels au-dessus du niveau de bruit
+    significant_pixels = data[data > (background + 3 * noise)]
+    
+    if len(significant_pixels) > 0:
+        # 5. Calcul du point de référence pour les hautes lumières
+        # Utilise le 99.5 percentile des pixels significatifs
+        highlights = np.percentile(significant_pixels, 99.5)
+    else:
+        highlights = background + 3 * noise
+    
+    # 6. Protection des ombres
+    shadows = background + shadow_protection * (highlights - background)
+    
+    # 7. Application de la transformation
+    # Ajuste le background au niveau cible
+    m = target_background / (background - shadows)
+    b = -m * shadows
+    
+    # Application de la transformation
+    stretched = m * data + b
+    
     return np.clip(stretched, 0, 1)
+
+# Alias pour la compatibilité avec le code existant
+apply_stf = auto_stf
 
 def save_preview(rgb_data: np.ndarray, storage_service: StorageService, job_id: str) -> str:
     """Sauvegarde une preview dans MinIO"""
@@ -61,7 +105,6 @@ async def get_services():
         finally:
             await session.close()
 
-@shared_task(name="process_hoo_preset")
 async def process_hoo_preset(job_id: str, target_id: str, files: list):
     """
     Traitement HOO :
@@ -122,7 +165,6 @@ async def process_hoo_preset(job_id: str, target_id: str, files: list):
             )
             raise
 
-@shared_task(name="generate_channel_previews")
 async def generate_channel_previews(download_result):
     """Génère des previews pour chaque canal (H-alpha, OIII, etc.)"""
     logging.info(f"Génération des previews pour les fichiers téléchargés: {download_result}")
@@ -190,7 +232,6 @@ async def generate_channel_previews(download_result):
                 )
             raise
 
-@shared_task(name="wait_user_validation")
 async def wait_user_validation(preview_result):
     """Attend la validation utilisateur avant de continuer le traitement"""
     logging.info(f"En attente de validation utilisateur pour: {preview_result}")

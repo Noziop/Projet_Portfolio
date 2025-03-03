@@ -6,10 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, get_current_user
 from app.services.workflow.service import WorkflowService
 from app.core.ws.manager import ConnectionManager
-from app.schemas.task import TaskResponse
+from app.schemas.task import TaskResponse, DownloadTaskCreate, DownloadTaskResponse
 from app.schemas.processing import ProcessingJobCreate
+from app.db.session import get_session
+from app.services.target.service import TargetService
+from app.services.storage.service import StorageService
 
 router = APIRouter()
+ws_manager = ConnectionManager()
 
 @router.post("/process", status_code=status.HTTP_202_ACCEPTED, response_model=TaskResponse)
 async def process_with_preset(
@@ -84,3 +88,43 @@ async def get_task_result(
         )
         
     return result
+
+@router.post("/download", response_model=DownloadTaskResponse)
+async def start_download(
+    request: DownloadTaskCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+) -> DownloadTaskResponse:
+    """
+    Lance le téléchargement d'une cible avec un preset spécifique.
+    """
+    try:
+        storage_service = StorageService()
+        target_service = TargetService(
+            session=db,
+            storage_service=storage_service,
+            ws_manager=ws_manager
+        )
+        
+        task = await target_service.start_download(
+            target_id=request.target_id,
+            preset_id=request.preset_id,
+            user_id=current_user.id
+        )
+        
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Impossible de démarrer le téléchargement"
+            )
+            
+        return DownloadTaskResponse(
+            task_id=task.id,
+            status=task.status.value
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
