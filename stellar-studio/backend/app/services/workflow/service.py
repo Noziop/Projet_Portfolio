@@ -27,8 +27,11 @@ from app.domain.value_objects.task_types import TaskType, TaskStatus
 from app.domain.value_objects.processing_types import ProcessingStepType
 
 from app.services.storage.service import StorageService
-from app.tasks.processing.tasks import generate_channel_previews, wait_user_validation
-from app.tasks.download.tasks import download_mast_files
+from app.tasks.processing.tasks import (
+    process_hoo_preset, 
+    generate_channel_previews, 
+    wait_user_validation
+)
 
 # Métriques Prometheus
 workflow_operations = Counter(
@@ -134,7 +137,6 @@ class WorkflowService:
 
             # Lancement des tâches Celery
             chain(
-                download_mast_files.s(str(job.id)),
                 generate_channel_previews.s(),
                 wait_user_validation.s()
             ).apply_async()

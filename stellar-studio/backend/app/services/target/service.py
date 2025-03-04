@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram, Gauge
 from celery import chain
+import logging
 
 from app.core.ws.manager import ConnectionManager
 from app.core.ws.events import (
@@ -19,6 +20,7 @@ from app.infrastructure.repositories.target_file_repository import TargetFileRep
 from app.infrastructure.repositories.preset_repository import PresetRepository
 from app.infrastructure.repositories.task_repository import TaskRepository
 from app.infrastructure.repositories.target_preset_repository import TargetPresetRepository
+from app.infrastructure.repositories.filter_repository import FilterRepository
 
 from app.infrastructure.repositories.models.target import Target
 from app.infrastructure.repositories.models.target_file import TargetFile
@@ -30,7 +32,6 @@ from app.domain.value_objects.target_types import ObjectType, TargetStatus
 from app.domain.value_objects.task_types import TaskType, TaskStatus
 
 from app.services.storage.service import StorageService
-from app.tasks.download.tasks import download_mast_files
 from app.tasks.processing.tasks import process_hoo_preset, generate_channel_previews, wait_user_validation
 
 # Métriques Prometheus
@@ -64,6 +65,7 @@ class TargetService:
         self.preset_repository = PresetRepository(session)
         self.task_repository = TaskRepository(session)
         self.target_preset_repository = TargetPresetRepository(session)
+        self.filter_repository = FilterRepository(session)
         self.storage_service = storage_service
         self.ws_manager = ws_manager
 
@@ -109,11 +111,16 @@ class TargetService:
 
     async def start_download(
         self,
+        user_id: UUID,
         target_id: UUID,
         preset_id: UUID,
-        user_id: UUID
+        telescope_id: UUID
     ) -> Optional[Task]:
-        """Lance le téléchargement des fichiers pour une cible et un preset"""
+        """Lance le téléchargement des fichiers depuis MAST pour une cible et un preset.
+        """
+        from app.tasks.download.tasks import download_mast_files  # Import local pour éviter les imports circulaires
+        
+        target_processing_duration.labels(operation='download_start').time()
         try:
             target = await self.target_repository.get(target_id)
             preset = await self.preset_repository.get(preset_id)
@@ -125,6 +132,17 @@ class TargetService:
                 )
                 return None
 
+            # Si telescope_id n'est pas fourni, utiliser celui associé au target
+            if telescope_id is None:
+                if target.telescope_id:
+                    telescope_id = target.telescope_id
+                else:
+                    await self.ws_manager.send_error(
+                        user_id,
+                        "Aucun télescope spécifié ou associé à la cible"
+                    )
+                    return None
+
             # Création de la tâche
             task = Task(
                 type=TaskType.DOWNLOAD,
@@ -132,7 +150,8 @@ class TargetService:
                 user_id=user_id,
                 params={
                     "target_id": str(target_id),
-                    "preset_id": str(preset_id)
+                    "preset_id": str(preset_id),
+                    "telescope_id": str(telescope_id)
                 }
             )
             task = await self.task_repository.create(task)
@@ -148,7 +167,7 @@ class TargetService:
                 download_mast_files.s(
                     str(task.id),
                     str(target_id),
-                    str(preset_id)
+                    str(telescope_id)
                 ),
                 generate_channel_previews.s()  # Génère une preview pour chaque canal
             )
@@ -162,9 +181,9 @@ class TargetService:
             target_operations.labels(operation='download_start', status='failed').inc()
             await self.ws_manager.send_error(
                 user_id,
-                f"Erreur lors du démarrage du téléchargement: {str(e)}"
+                f"Erreur lors du lancement du téléchargement: {str(e)}"
             )
-            raise
+            return None
 
     async def update_download_progress(
         self,
@@ -405,4 +424,66 @@ class TargetService:
             return None
         except Exception as e:
             target_operations.labels(operation='generate_preview', status='failed').inc()
+            return None
+
+    async def add_file_from_mast(
+        self,
+        target_id: UUID,
+        file_path: str,
+        mast_id: str,
+        file_size: int,
+        telescope_id: UUID
+    ) -> Optional[TargetFile]:
+        """Ajoute un fichier téléchargé depuis MAST à un target
+        
+        Args:
+            target_id: ID de la cible
+            file_path: Chemin du fichier téléchargé dans MinIO
+            mast_id: Identifiant MAST du fichier
+            file_size: Taille du fichier en octets
+            telescope_id: ID du télescope utilisé
+            
+        Returns:
+            Le fichier créé ou None en cas d'erreur
+        """
+        try:
+            # Récupération de la cible
+            target = await self.target_repository.get(target_id)
+            if not target:
+                logging.error(f"Cible non trouvée: {target_id}")
+                return None
+                
+            # Récupération des filtres pour ce télescope
+            filters = await self.filter_repository.get_by_telescope(telescope_id)
+            if not filters:
+                logging.warning(f"Aucun filtre trouvé pour le télescope {telescope_id}")
+            
+            # Le fichier est déjà stocké dans MinIO, pas besoin de le stocker à nouveau
+            # Création du TargetFile directement avec le chemin MinIO fourni
+            target_file = TargetFile(
+                target_id=target_id,
+                file_path=file_path,  # Utiliser directement le chemin MinIO
+                mast_id=mast_id,
+                file_size=file_size,
+                telescope_id=telescope_id
+            )
+            
+            # Enregistrement dans la base de données
+            created_file = await self.target_file_repository.create(target_file)
+            
+            if created_file:
+                logging.info(f"Fichier ajouté avec succès: {file_path}")
+                
+                # Mise à jour des presets disponibles en fonction du type d'objet
+                presets = await self.preset_repository.get_by_object_type(target.object_type)
+                for preset in presets:
+                    await self.update_preset_availability(target_id, preset.id)
+                
+                return created_file
+            else:
+                logging.error("Échec de la création du fichier dans la base de données")
+                return None
+                
+        except Exception as e:
+            logging.error(f"Erreur lors de l'ajout du fichier MAST: {str(e)}")
             return None

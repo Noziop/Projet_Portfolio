@@ -96,6 +96,10 @@ async def start_download(
 ) -> DownloadTaskResponse:
     """
     Lance le téléchargement d'une cible avec un preset spécifique.
+    
+    - **target_id**: ID de la cible à télécharger
+    - **preset_id**: ID du preset à appliquer
+    - **telescope_id**: (optionnel) ID du télescope à utiliser. Si non fourni, utilise celui associé à la cible.
     """
     try:
         storage_service = StorageService()
@@ -108,7 +112,8 @@ async def start_download(
         task = await target_service.start_download(
             target_id=request.target_id,
             preset_id=request.preset_id,
-            user_id=current_user.id
+            user_id=current_user.id,
+            telescope_id=request.telescope_id if hasattr(request, 'telescope_id') else None
         )
         
         if not task:

@@ -94,9 +94,10 @@ class TaskListResponse(BaseModel):
     size: int
 
 class DownloadTaskCreate(BaseModel):
-    """Schéma pour la création d'une tâche de téléchargement"""
-    target_id: UUID4
-    preset_id: UUID4
+    """Requête de création d'une tâche de téléchargement"""
+    target_id: UUID
+    preset_id: UUID
+    telescope_id: Optional[UUID] = None
 
 class DownloadTaskResponse(BaseModel):
     """Schéma pour la réponse d'une tâche de téléchargement"""

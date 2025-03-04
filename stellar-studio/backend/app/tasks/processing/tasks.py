@@ -1,6 +1,7 @@
 from celery import shared_task
 from uuid import UUID
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 import numpy as np
 from PIL import Image
@@ -105,12 +106,8 @@ async def get_services():
         finally:
             await session.close()
 
-async def process_hoo_preset(job_id: str, target_id: str, files: list):
-    """
-    Traitement HOO :
-    - Ha : Rouge
-    - OIII : Vert + Bleu
-    """
+async def _process_hoo_preset_async(job_id: str, target_id: str, files: list):
+    """Version asynchrone du traitement HOO"""
     async with get_services() as (storage_service, workflow_service):
         try:
             # 1. Récupération des fichiers
@@ -165,10 +162,13 @@ async def process_hoo_preset(job_id: str, target_id: str, files: list):
             )
             raise
 
-async def generate_channel_previews(download_result):
-    """Génère des previews pour chaque canal (H-alpha, OIII, etc.)"""
-    logging.info(f"Génération des previews pour les fichiers téléchargés: {download_result}")
-    
+@shared_task(name="app.tasks.processing.tasks.process_hoo_preset")
+def process_hoo_preset(job_id: str, target_id: str, files: list):
+    """Tâche Celery pour le traitement HOO"""
+    return asyncio.run(_process_hoo_preset_async(job_id, target_id, files))
+
+async def _generate_channel_previews_async(download_result):
+    """Version asynchrone de la génération des previews"""
     async with get_services() as (storage_service, workflow_service):
         try:
             task_id = download_result.get("task_id")
@@ -232,10 +232,13 @@ async def generate_channel_previews(download_result):
                 )
             raise
 
-async def wait_user_validation(preview_result):
-    """Attend la validation utilisateur avant de continuer le traitement"""
-    logging.info(f"En attente de validation utilisateur pour: {preview_result}")
-    
+@shared_task(name="app.tasks.processing.tasks.generate_channel_previews")
+def generate_channel_previews(download_result):
+    """Tâche Celery pour la génération des previews"""
+    return asyncio.run(_generate_channel_previews_async(download_result))
+
+async def _wait_user_validation_async(preview_result):
+    """Version asynchrone de l'attente de validation"""
     async with get_services() as (storage_service, workflow_service):
         try:
             task_id = preview_result.get("task_id")
@@ -279,3 +282,8 @@ async def wait_user_validation(preview_result):
                     f"Erreur pendant l'attente de validation: {str(e)}"
                 )
             raise
+
+@shared_task(name="app.tasks.processing.tasks.wait_user_validation")
+def wait_user_validation(preview_result):
+    """Tâche Celery pour l'attente de validation utilisateur"""
+    return asyncio.run(_wait_user_validation_async(preview_result))

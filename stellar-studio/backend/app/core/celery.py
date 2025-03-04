@@ -7,14 +7,14 @@ celery_app = Celery(
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
     include=[
-        "app.tasks.download",
-        "app.tasks.processing"
+        "app.tasks.download.tasks",
+        "app.tasks.processing.tasks"
     ]
 )
 
 celery_app.conf.task_routes = {
-    "app.tasks.download.*": {"queue": "download_queue"},
-    "app.tasks.processing.*": {"queue": "processing_queue"},
+    "app.tasks.download.tasks.*": {"queue": "download"},
+    "app.tasks.processing.tasks.*": {"queue": "processing"}
 }
 
 celery_app.conf.update(

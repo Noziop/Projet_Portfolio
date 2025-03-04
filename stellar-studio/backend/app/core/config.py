@@ -26,8 +26,7 @@ class Settings(BaseSettings):
     REDIS_SESSION_DB: int
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
-    CELERY_WORKER_NAME: str
-    HOSTNAME: str
+  
     
     # Session
     SESSION_DURATION_MINUTES: int

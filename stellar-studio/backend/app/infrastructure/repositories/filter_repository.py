@@ -13,19 +13,19 @@ class FilterRepository(BaseRepository[Filter]):
         super().__init__(Filter, session)
 
     async def get_by_telescope(self, telescope_id: UUID) -> List[Filter]:
-        """Récupère tous les filtres pour un télescope donné avec chargement contrôlé des relations"""
-        # Création de la requête en utilisant joinedload au lieu de selectinload + load_only
-        query = (
-            select(Filter)
-            .where(Filter.telescope_id == str(telescope_id))
-            .options(
-                selectinload(Filter.telescope)
-            )
-            .order_by(Filter.name)
-        )
+        """Récupère tous les filtres associés à un télescope donné
         
+        Args:
+            telescope_id: ID du télescope
+            
+        Returns:
+            Liste des filtres associés au télescope
+        """
+        query = select(Filter).where(Filter.telescope_id == str(telescope_id))
         result = await self.session.execute(query)
-        return result.scalars().all()
+        filters = result.scalars().all()
+        
+        return list(filters)
 
     async def get_by_type(self, filter_type: FilterType) -> List[Filter]:
         query = select(Filter).where(Filter.filter_type == filter_type)
