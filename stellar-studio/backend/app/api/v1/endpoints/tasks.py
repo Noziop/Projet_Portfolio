@@ -10,6 +10,7 @@ from app.schemas.task import TaskResponse, DownloadTaskCreate, DownloadTaskRespo
 from app.schemas.processing import ProcessingJobCreate
 from app.services.target.service import TargetService
 from app.services.storage.service import StorageService
+from app.schemas.task import TaskStatus
 
 router = APIRouter()
 ws_manager = ConnectionManager()
@@ -49,23 +50,49 @@ async def get_task_status(
     """Vérifie le statut d'une tâche"""
     workflow_service = WorkflowService(
         session=db,
+        storage_service=StorageService(),
         ws_manager=ConnectionManager()
     )
     
-    task = await workflow_service.get_task(task_id)
+    task = await workflow_service.get_task(task_id, current_user.id)
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tâche non trouvée"
         )
-        
-    if str(task.user_id) != str(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous n'êtes pas autorisé à accéder à cette tâche"
-        )
-        
-    return {"task_id": task.id, "status": task.status.value, "progress": task.progress}
+    
+    # Adapter la réponse au format attendu par TaskResponse
+    status_value = task["status"].value if hasattr(task["status"], "value") else str(task["status"])
+    
+    # Déterminer le type de tâche en fonction des métadonnées disponibles
+    task_type = "PROCESSING"  # Valeur par défaut
+    
+    # Si c'est une tâche de téléchargement, elle aura probablement des métadonnées spécifiques
+    if "telescope_id" in task.get("params", {}) or task.get("type") == "DOWNLOAD":
+        task_type = "DOWNLOAD"
+    elif "stacking_params" in task.get("params", {}) or task.get("type") == "STACKING":
+        task_type = "STACKING"
+    elif "calibration_params" in task.get("params", {}) or task.get("type") == "CALIBRATION":
+        task_type = "CALIBRATION"
+    elif task.get("type") and task["type"] in ["DOWNLOAD", "PROCESSING", "STACKING", "CALIBRATION"]:
+        task_type = task["type"]
+    
+    # Retourner un dictionnaire qui correspond exactement à la structure TaskResponse
+    return {
+        "id": task["id"],
+        "user_id": task["user_id"],
+        "type": task_type,
+        "params": task.get("params", {}),
+        "status": status_value,
+        "progress": task["progress"],
+        "task_id": task["id"],
+        "created_at": task["created_at"],
+        "result": task.get("result"),
+        "error": task.get("error"),
+        "completed_at": task.get("completed_at"),
+        "user_name": task.get("user_name"),
+        "duration": task.get("duration")
+    }
 
 @router.get("/{task_id}/result")
 async def get_task_result(
@@ -76,16 +103,37 @@ async def get_task_result(
     """Récupère le résultat d'une tâche terminée"""
     workflow_service = WorkflowService(
         session=db,
+        storage_service=StorageService(),
         ws_manager=ConnectionManager()
     )
     
+    # Vérifier d'abord si la tâche existe
+    task = await workflow_service.get_task(task_id, current_user.id)
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tâche non trouvée"
+        )
+    
+    # Vérifier si la tâche est terminée
+    if task["status"] != TaskStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La tâche n'est pas encore terminée"
+        )
+    
+    # Récupérer le résultat
     result = await workflow_service.get_task_result(task_id, current_user.id)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Résultat non trouvé ou tâche non terminée"
+            detail="Résultat non disponible"
         )
-        
+    
+    # Assurons-nous que le résultat est bien un dictionnaire
+    if not isinstance(result, dict):
+        result = {"data": result}
+    
     return result
 
 @router.post("/download", response_model=DownloadTaskResponse)

@@ -179,14 +179,22 @@ def download_mast_files(task_id: str, target_id: str, telescope_id: str):
     """
     task_logger.info(f"Démarrage du téléchargement MAST: task_id={task_id}, target_id={target_id}, telescope_id={telescope_id}")
     
+    # Créer un nouveau loop asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     try:
+        task_logger.info(f"Exécution de _download_mast_files_async pour task_id={task_id}")
         results = loop.run_until_complete(
             _download_mast_files_async(task_id, target_id, telescope_id, loop)
         )
-        task_logger.info(f"Téléchargement MAST terminé: task_id={task_id}, fichiers téléchargés={len(results.get('files', []))}")
+        task_logger.info(f"Téléchargement MAST terminé: task_id={task_id}, résultats={results}")
+        task_logger.info(f"Fichiers téléchargés: {len(results.get('files', []))}")
+        
+        # Vérification supplémentaire pour s'assurer que le statut est bien mis à jour
+        status_check = loop.run_until_complete(check_task_status(task_id))
+        task_logger.info(f"État final de la tâche après téléchargement: {status_check}")
+        
         return results
     except Exception as e:
         task_logger.error(f"Erreur lors du téléchargement MAST: task_id={task_id}, erreur={str(e)}")
@@ -194,6 +202,26 @@ def download_mast_files(task_id: str, target_id: str, telescope_id: str):
         raise
     finally:
         loop.close()
+
+async def check_task_status(task_id: str):
+    """Vérifie et log le statut d'une tâche"""
+    try:
+        async with AsyncSessionLocal() as session:
+            from app.services.target.repository import TargetTaskRepository
+            task_repository = TargetTaskRepository(session)
+            task = await task_repository.get_task(UUID(task_id))
+            if task:
+                return {
+                    "task_id": str(task.id),
+                    "status": task.status.value if hasattr(task.status, "value") else str(task.status),
+                    "type": task.type if hasattr(task, "type") else "UNKNOWN",
+                    "progress": task.progress,
+                    "error": task.error,
+                    "result": "available" if task.result else "none"
+                }
+            return {"task_id": task_id, "status": "NOT_FOUND"}
+    except Exception as e:
+        return {"task_id": task_id, "status": "ERROR", "error": str(e)}
 
 async def _download_mast_files_async(task_id: str, target_id: str, telescope_id: str, loop):
     """Télécharge les fichiers FITS depuis MAST de manière asynchrone

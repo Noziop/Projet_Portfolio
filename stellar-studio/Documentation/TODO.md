@@ -1,12 +1,12 @@
 # TODO List - Stellar Studio
 
 ## 🔥 Priorité Haute (Bloquant pour la démo)
-- [ ] **Endpoint de Download**
+- [x] **Endpoint de Download**
   - Créer un endpoint `/tasks/download` dédié
   - Intégrer avec le service de téléchargement
   - Assurer la cohérence avec le frontend
 
-- [ ] **Gestion des tâches Celery**
+- [x] **Gestion des tâches Celery**
   - Résoudre la double déclaration des tâches (tasks/ et core/tasks.py)
   - Standardiser les noms des tâches
   - Assurer la cohérence des chaînes de tâches pour le traitement d'images
@@ -38,6 +38,14 @@
   - Créer un README clair
 
 ## 📝 Priorité Basse (Pour l'après-démo)
+- [ ] **Optimisation du téléchargement MAST**
+  - Débugger l'erreur "'telescope_id' is an invalid keyword argument for TargetFile"
+  - Corriger le statut FAILED malgré le téléchargement réussi dans MinIO
+  - Ajouter une vérification préalable des fichiers existants dans MinIO pour éviter les téléchargements redondants
+  - Optimiser la sélection des fichiers pertinents (ex: M104 prend ~2h pour télécharger tous les fichiers)
+  - Implémenter une stratégie intelligente pour récupérer prioritairement les fichiers nécessaires à la mosaïque
+  - Ajouter une option pour limiter le nombre de fichiers téléchargés par cible
+
 - [ ] **Tests**
   - Mettre en place une structure de tests
   - Écrire des tests unitaires basiques

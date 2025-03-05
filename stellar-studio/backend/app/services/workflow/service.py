@@ -342,3 +342,41 @@ class WorkflowService:
             "success_rate": await self.calculate_success_rate(workflow_id),
             "average_duration": await self.calculate_average_duration(workflow_id)
         }
+
+    async def get_task(self, task_id: UUID, user_id: UUID) -> Optional[Dict]:
+        """Récupère une tâche"""
+        task = await self.task_repository.get(task_id)
+        if not task or task.user_id != user_id:
+            return None
+            
+        # Retourne un dictionnaire correctement formaté
+        task_dict = {
+            "id": task.id,
+            "user_id": task.user_id,
+            "status": task.status,
+            "progress": task.progress if hasattr(task, "progress") else 0,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at if hasattr(task, "updated_at") else None,
+            "params": task.params if hasattr(task, "params") else {},
+            "result": task.result if hasattr(task, "result") else None,
+            "error": task.error if hasattr(task, "error") else None,
+            "completed_at": task.completed_at if hasattr(task, "completed_at") else None,
+            "type": task.type if hasattr(task, "type") else "PROCESSING"  # Valeur par défaut pour la rétrocompatibilité
+        }
+        
+        return task_dict
+
+    async def get_task_result(self, task_id: UUID, user_id: UUID) -> Optional[Dict]:
+        """Récupère le résultat d'une tâche terminée"""
+        task = await self.task_repository.get(task_id)
+        if not task or task.user_id != user_id:
+            return None
+        
+        # Vérifier explicitement si la tâche est terminée et a un résultat
+        if not hasattr(task, "status") or task.status != TaskStatus.COMPLETED:
+            return None
+        
+        if not hasattr(task, "result") or task.result is None:
+            return None
+        
+        return task.result
