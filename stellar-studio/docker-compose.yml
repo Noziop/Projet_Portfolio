@@ -100,13 +100,11 @@ services:
       - traefik_network
 
   celery-download:
-    hostname: "celery-download-${CELERY_WORKER_ID:-1}"
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
     - PYTHONPATH=/app
-    - CELERY_WORKER_NAME=download-worker-${HOSTNAME}
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
@@ -114,8 +112,7 @@ services:
       - .env
     command: >
       celery -A app.core.celery worker 
-      -Q download_queue 
-      -n "download-worker-$${HOSTNAME}@%h" 
+      -Q download 
       --loglevel=info
     depends_on:
       redis:
@@ -128,7 +125,7 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping -d download@$$HOSTNAME"]
+      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -137,13 +134,11 @@ services:
       - traefik_network
 
   celery-processing:
-    hostname: "celery-processing-${CELERY_WORKER_ID:-1}"
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
     environment:
     - PYTHONPATH=/app
-    - CELERY_WORKER_NAME=processing-worker-${HOSTNAME}
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
@@ -151,8 +146,7 @@ services:
       - .env
     command: >
       celery -A app.core.celery worker 
-      -Q processing_queue 
-      -n "processing-worker-$${HOSTNAME}@%h" 
+      -Q processing 
       --loglevel=info
     depends_on:
       redis:
@@ -165,7 +159,7 @@ services:
       restart_policy:
         condition: on-failure
     healthcheck:
-      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping -d processing@$$HOSTNAME"]
+      test: ["CMD-SHELL", "celery -A app.core.celery inspect ping"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -177,13 +171,13 @@ services:
     image: grafana/celery-exporter
     command: >
       --broker-url=redis://redis:6379/0
-      --queues=download_queue:type=download,processing_queue:type=processing
+      --queues=download:type=download,processing:type=processing
     environment:
       - TZ=Europe/Paris
       - CE_BROKER_URL=redis://redis:6379/0
       - CE_BUCKETS=1,2.5,5,10,30,60,300,600,900,1800
-      - CELERY_QUEUE_NAME_MAPPING=download_queue:download,processing_queue:processing
-      - CELERY_WORKER_NAME_MAPPING=celery-download:download,celery-
+      - CELERY_QUEUE_NAME_MAPPING=download:download,processing:processing
+      - CELERY_WORKER_NAME_MAPPING=celery-download:download,celery-processing:processing
     networks:
       - traefik_network
 
@@ -197,14 +191,19 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
-      MINIO_BROWSER: "off"
+      MINIO_BROWSER: "on"
     volumes:
       - minio-data:/data
     labels:
       - "traefik.enable=true"
       # API S3
       - "traefik.http.routers.minio-api.rule=Host(`minio.stellarstudio.fassih.ch`) && PathPrefix(`/api`)"
-      - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio-api.service=minio-api-service"
+      - "traefik.http.services.minio-api-service.loadbalancer.server.port=9000"
+      # Console MinIO
+      - "traefik.http.routers.minio-console.rule=Host(`minio.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.minio-console.service=minio-console-service"
+      - "traefik.http.services.minio-console-service.loadbalancer.server.port=9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -213,7 +212,8 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.6
 
   frontend:
     build: ./frontend
