@@ -61,6 +61,15 @@
                   </template>
                   <div class="d-flex flex-column">
                     <span>{{ action.description }}</span>
+                    
+                    <v-progress-linear
+                      v-if="action.status === 'progress' && action.progress !== undefined"
+                      :model-value="action.progress"
+                      color="primary"
+                      height="5"
+                      class="mt-2"
+                    ></v-progress-linear>
+                    
                     <v-expand-transition>
                       <div v-if="action.files && action.files.length > 0" class="mt-2">
                         <v-chip
@@ -140,10 +149,16 @@ export default {
     },
 
     handleDownloadComplete(result) {
-      const successMessage = `Téléchargement terminé : ${result.message}`
+      const filesCount = result.files ? result.files.length : 0
+      const successMessage = `Téléchargement terminé : ${filesCount} fichiers disponibles`
+      
       this.showNotification(successMessage, 'success')
       
-      if (result && result.files && result.files.length > 0) {
+      if (result.target_id) {
+        this.currentTarget = result.target_id
+      }
+      
+      if (result.files && result.files.length > 0) {
         this.currentImage = result.files[0]
       }
       
@@ -165,12 +180,15 @@ export default {
         text: data.message,
         color: 'info'
       }
-      // On met à jour uniquement le status sans polluer l'historique
-      if (data.status === 'progress') {
-        this.processingStatus = {
-          text: data.message,
-          color: 'info'
-        }
+      
+      if (data.status === 'progress' && data.progress !== undefined && 
+          (data.progress === 0 || data.progress % 25 === 0 || data.progress === 100)) {
+        this.addToHistory({
+          description: data.message,
+          timestamp: new Date().toLocaleTimeString(),
+          status: 'progress',
+          progress: data.progress
+        })
       }
     },
 

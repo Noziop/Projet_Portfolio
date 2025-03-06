@@ -19,14 +19,25 @@
         label="Select Target"
         item-title="name"
         item-value="id"
+        @update:model-value="loadPresets"
         :disabled="!selectedTelescope || loading"
         :loading="loading"
+      ></v-select>
+
+      <v-select
+        v-model="selectedPreset"
+        :items="availablePresets"
+        label="Select Preset"
+        item-title="name"
+        item-value="id"
+        :disabled="!selectedTarget || loadingPresets"
+        :loading="loadingPresets"
       ></v-select>
 
       <v-btn
         block
         color="primary"
-        :disabled="!selectedTarget"
+        :disabled="!selectedTarget || !selectedPreset"
         :loading="downloadLoading"
         @click="downloadFits"
       >
@@ -46,10 +57,13 @@ export default {
   setup(props, { emit }) {
     const selectedTelescope = ref(null)
     const selectedTarget = ref(null)
+    const selectedPreset = ref(null)
     const availableTargets = ref([])
     const telescopes = ref([])
+    const availablePresets = ref([])
     const loading = ref(false)
     const loadingTelescopes = ref(false)
+    const loadingPresets = ref(false)
     const downloadLoading = ref(false)
     const downloadStatus = ref('idle') // 'idle', 'downloading', 'success', 'error'
 
@@ -142,21 +156,53 @@ export default {
       } finally {
         loading.value = false
       }
+      
+      // Réinitialiser le preset quand on change de cible
+      selectedPreset.value = null
+    }
+
+    const loadPresets = async () => {
+      if (!selectedTarget.value) return
+      
+      loadingPresets.value = true
+      selectedPreset.value = null
+      
+      try {
+        console.log(`Chargement des presets disponibles`);
+        
+        const response = await apiClient.get(`/presets/`)
+        console.log("Presets récupérés:", response.data);
+        
+        availablePresets.value = response.data;
+        
+        // Sélectionner le premier preset par défaut si disponible
+        if (availablePresets.value.length > 0) {
+          selectedPreset.value = availablePresets.value[0].id;
+        }
+      } catch (error) {
+        console.error('Échec du chargement des presets:', error);
+        emit('error', 'Échec du chargement des presets')
+        availablePresets.value = []
+      } finally {
+        loadingPresets.value = false
+      }
     }
 
     const downloadFits = async () => {
-      if (!selectedTarget.value || !selectedTelescope.value) return
+      if (!selectedTarget.value || !selectedTelescope.value || !selectedPreset.value) return
 
       downloadLoading.value = true
       downloadStatus.value = 'downloading'
       
       try {
-        // Trouver le target sélectionné pour avoir son nom
+        // Trouver le target sélectionné pour avoir son nom pour les logs
         const target = availableTargets.value.find(t => t.id === selectedTarget.value)
         
+        // API mise à jour pour correspondre à l'attente du backend
         const response = await apiClient.post(`/tasks/download`, {
-          telescope: selectedTelescope.value,
-          object_name: target.name  // On envoie le nom au lieu de l'ID
+          target_id: selectedTarget.value,
+          preset_id: selectedPreset.value,
+          telescope_id: selectedTelescope.value
         })
         
         emit('download-started', {
@@ -178,54 +224,67 @@ export default {
       const checkStatus = async () => {
         try {
           const response = await apiClient.get(`/tasks/${taskId}`)
+          console.log("Statut de la tâche:", response.data)
           
-          if (response.data.status === 'SUCCESS') {
-            if (response.data.result.status === 'success') {
-              downloadStatus.value = 'success'
-              emit('download-complete', {
-                files: response.data.result.files,
-                message: response.data.result.message  // On transmet le message de succès
-              })
-              return true
-            } else if (response.data.result.status === 'error') {
-              downloadStatus.value = 'error'
-              emit('error', response.data.result.message)
-              return true
+          // Extraction des informations utiles
+          const status = response.data.status
+          const progressInfo = response.data.error || response.data.result?.message || ''
+          
+          // Gestion des différents états
+          if (status === 'COMPLETED') {
+            downloadStatus.value = 'success'
+            emit('download-complete', {
+              target_id: response.data.params.target_id,
+              files: response.data.result?.files || [],
+              message: `Téléchargement terminé : ${progressInfo}`
+            })
+            return true
+          } else if (status === 'FAILED') {
+            downloadStatus.value = 'error'
+            emit('error', progressInfo || 'Échec du téléchargement')
+            return true
+          } else if (status === 'RUNNING' || status === 'PENDING') {
+            // Extraire le progrès du message d'erreur (qui contient en fait l'état d'avancement)
+            let progressMessage = progressInfo
+            let progressValue = 0
+            
+            // Analyse du message de progression "(X/Y)"
+            const progressMatch = /\((\d+)\/(\d+)\)/.exec(progressInfo)
+            if (progressMatch) {
+              const [_, current, total] = progressMatch
+              progressValue = (parseInt(current) / parseInt(total)) * 100
+              progressMessage = `Téléchargement des fichiers ${current}/${total} (${progressValue.toFixed(0)}%)`
             }
-          } else if (response.data.status === 'PENDING') {
-            emit('download-progress', 'Téléchargement en cours...')
-          } else if (response.data.status === 'PROGRESS') {
+            
             emit('download-progress', {
               status: 'progress',
-              message: response.data.result?.status || 'Téléchargement en cours...'
+              progress: progressValue,
+              message: progressMessage
             })
-          } else if (response.data.status === 'FAILURE') {
-            downloadStatus.value = 'error'
-            emit('error', response.data.result || 'Échec du téléchargement')
-            return true
           }
           return false
         } catch (error) {
           console.error('Échec de la vérification du statut:', error)
-          downloadStatus.value = 'error'
-          emit('error', 'Erreur lors de la vérification du statut')
-          return true
+          // Ne pas considérer une erreur réseau comme une erreur définitive
+          emit('download-progress', {
+            status: 'progress',
+            message: 'Vérification du statut en cours...'
+          })
+          return false // Continuer à vérifier
         }
       }
 
+      // Vérifier immédiatement la première fois
+      checkStatus()
+      
+      // Puis vérifier toutes les 5 secondes
       const interval = setInterval(async () => {
         const done = await checkStatus()
         if (done) clearInterval(interval)
-      }, 2000)
-
-      // Nettoyage après 5 minutes
-      setTimeout(() => {
-        clearInterval(interval)
-        if (downloadStatus.value === 'downloading') {
-          downloadStatus.value = 'error'
-          emit('error', 'Le téléchargement a expiré')
-        }
-      }, 300000)
+      }, 5000) // Augmenté à 5 secondes pour réduire le nombre de requêtes au serveur
+      
+      // Ne pas définir de timeout - laisser le téléchargement se terminer naturellement
+      // Le téléchargement peut prendre un temps considérable selon la cible
     }
 
     // Charger les télescopes au montage du composant
@@ -236,13 +295,17 @@ export default {
     return {
       selectedTelescope,
       selectedTarget,
+      selectedPreset,
       telescopes,
       availableTargets,
+      availablePresets,
       loading,
       loadingTelescopes,
+      loadingPresets,
       downloadLoading,
       downloadStatus,
       loadTargets,
+      loadPresets,
       downloadFits
     }
   }
