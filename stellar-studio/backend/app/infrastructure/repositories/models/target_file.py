@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, BigInteger, Boolean, JSON, ForeignKey, Ch
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.mysql import CHAR
 from app.db.base_class import Base
+from app.infrastructure.repositories.models.telescope import SpaceTelescope
 import json
 import os
 
@@ -110,6 +111,17 @@ class TargetFile(Base):
         back_populates="target_file",
         cascade="all, delete-orphan",
         lazy="selectin"
+    )
+
+    # La relation avec telescope doit être indirecte via le Target
+    # La colonne telescope_id n'existe pas dans la table target_files
+    telescope = relationship(
+        "SpaceTelescope",
+        secondary="targets",
+        primaryjoin="TargetFile.target_id == Target.id",
+        secondaryjoin="Target.telescope_id == SpaceTelescope.id",
+        viewonly=True,
+        lazy="joined"
     )
 
     # Validateurs

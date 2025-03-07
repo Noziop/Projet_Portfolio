@@ -337,13 +337,17 @@ async def get_target_preview(
     target_id: UUID,
     response: Response,
     if_none_match: Optional[str] = None,
+    preset_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """Récupère l'URL de preview pour une cible avec support de cache Redis"""
+    """
+    Récupère les URLs de prévisualisation pour une cible avec support de cache Redis.
+    Si preset_id est fourni, les prévisualisations seront générées spécifiquement pour ce preset.
+    """
     start_time = time.time()
     
-    # Clé de cache pour la preview de cette cible
-    cache_key = f"target_preview_{target_id}"
+    # Clé de cache incluant le preset_id si fourni
+    cache_key = f"target_preview_{target_id}_{preset_id or 'default'}"
     
     # Vérifier le cache Redis
     cache_entry = RedisCache.get("target_preview", cache_key)
@@ -365,19 +369,27 @@ async def get_target_preview(
         ws_manager=ConnectionManager()
     )
     
-    preview_path = await target_service.generate_target_preview(target_id)
-    if not preview_path:
-        raise HTTPException(status_code=404, detail="Pas de preview disponible pour cette cible")
+    preview_result = await target_service.generate_target_preview(target_id, preset_id)
+    if not preview_result or not preview_result.get("preview_urls"):
+        raise HTTPException(status_code=404, detail="Pas de prévisualisation disponible pour cette cible")
     
-    result = {"preview_url": preview_path}
+    # Formatage du résultat
+    result = {
+        "preview_urls": preview_result.get("preview_urls", {}),
+        "all_files_available": preview_result.get("all_files_available", False),
+        "missing_filters": preview_result.get("missing_filters", [])
+    }
     
-    # Mise en cache Redis - plus long car les previews changent rarement
+    # Mise en cache Redis - plus long car les prévisualisations changent rarement
     RedisCache.set("target_preview", cache_key, result, ttl=CACHE_TTL_LONG)
     
-    # Récupérer l'ETag du cache
-    updated_cache = RedisCache.get("target_preview", cache_key)
-    if updated_cache and updated_cache.get("etag"):
-        response.headers["ETag"] = updated_cache.get("etag")
+    # Générer un ETag
+    etag = md5(json.dumps(result).encode()).hexdigest()
+    cache_entry = RedisCache.get("target_preview", cache_key)
+    if cache_entry:
+        cache_entry["etag"] = etag
+        RedisCache.set("target_preview", cache_key, cache_entry, ttl=CACHE_TTL_LONG)
     
+    response.headers["ETag"] = etag
     logger.info(f"Preview for target {target_id} fetched in {time.time() - start_time:.3f}s")
     return result

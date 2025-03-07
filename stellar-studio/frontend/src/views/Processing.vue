@@ -62,6 +62,7 @@
                   <div class="d-flex flex-column">
                     <span>{{ action.description }}</span>
                     
+                    <!-- Barre de progression pour les actions en cours -->
                     <v-progress-linear
                       v-if="action.status === 'progress' && action.progress !== undefined"
                       :model-value="action.progress"
@@ -113,6 +114,8 @@ import DefaultLayout from '../layouts/DefaultLayout.vue'
 import ObjectSelector from '../components/ObjectSelector.vue'
 import ProcessingControls from '../components/ProcessingControls.vue'
 import ImageViewer from '../components/ImageViewer.vue'
+import websocketService, { createWebSocket } from '../services/websocket'
+import axios from 'axios'
 
 export default {
   name: 'Processing',
@@ -125,23 +128,136 @@ export default {
   data() {
     return {
       currentImage: null,
+      currentTarget: null,
       processingHistory: [],
       processingStatus: null,
+      activeTaskId: null,
+      enableWebSocket: false, // WebSocket désactivé par défaut
       snackbar: {
         show: false,
         text: '',
         color: 'info'
-      }
+      },
+      pollingInterval: null
     }
   },
+  mounted() {
+    // WebSocket est désactivé par défaut, on utilise le polling à la place
+    console.log('Processing: WebSocket est désactivé, utilisation du polling à la place');
+    
+    // Pour activer le WebSocket plus tard, utiliser:
+    // this.enableWebSocket = true;
+    // this.initWebSocket();
+  },
   methods: {
+    initWebSocket() {
+      if (this.enableWebSocket) {
+        try {
+          createWebSocket(true); // activer explicitement
+          websocketService.addListener('processing_update', this.handleWebSocketMessage);
+          console.log('Processing: Écouteur WebSocket ajouté pour processing_update');
+        } catch (error) {
+          console.error('Processing: Erreur lors de l\'initialisation WebSocket:', error);
+        }
+      }
+    },
+    
+    beforeUnmount() {
+      if (this.enableWebSocket) {
+        try {
+          websocketService.removeListener('processing_update', this.handleWebSocketMessage);
+          console.log('Processing: Écouteur WebSocket supprimé');
+        } catch (error) {
+          console.error('Processing: Erreur lors du nettoyage WebSocket:', error);
+        }
+      }
+    },
+    
+    handleWebSocketMessage(data) {
+      try {
+        console.log('Message WebSocket reçu dans Processing:', data);
+        
+        if (!data || typeof data !== 'object') return;
+        
+        if (data.task_id === this.activeTaskId) {
+          if (data.type === 'download_progress') {
+            this.processingStatus = {
+              text: data.message,
+              color: 'info'
+            };
+            
+            const progress = data.progress || 0;
+            if (progress === 0 || progress % 25 === 0 || progress === 100) {
+              this.addUniqueHistoryItem({
+                description: data.message,
+                timestamp: new Date().toLocaleTimeString(),
+                status: 'progress',
+                progress: progress
+              });
+            }
+          } else if (data.type === 'download_complete') {
+            this.processingStatus = {
+              text: 'Téléchargement terminé',
+              color: 'success'
+            };
+            
+            if (data.files && data.files.length > 0) {
+              if (!this.currentImage) {
+                this.currentImage = data.files[0].file_path;
+              }
+            }
+            
+            this.addUniqueHistoryItem({
+              description: data.message || `Téléchargement terminé : ${data.files ? data.files.length : 0} fichiers disponibles`,
+              timestamp: new Date().toLocaleTimeString(),
+              status: 'success',
+              files: data.files || []
+            });
+            
+            this.showNotification(data.message || `Téléchargement terminé : ${data.files ? data.files.length : 0} fichiers disponibles`, 'success');
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors du traitement du message WebSocket:', error);
+      }
+    },
+    
+    addUniqueHistoryItem(item) {
+      // Pour les téléchargements terminés, vérifier si c'est cohérent
+      if (item.description && item.description.includes('Téléchargement terminé')) {
+        // Nettoyer l'historique des anciens téléchargements terminés
+        this.processingHistory = this.processingHistory.filter(
+          h => !h.description.includes('Téléchargement terminé')
+        );
+        
+        // Ajouter seulement l'entrée actuelle
+        this.processingHistory.unshift(item);
+        return;
+      }
+      
+      // Comportement normal pour les autres types d'entrées
+      const existingItem = this.processingHistory.find(
+        h => h.description === item.description && h.status === item.status
+      );
+      
+      if (existingItem) {
+        Object.assign(existingItem, item);
+        this.processingHistory = [...this.processingHistory];
+      } else {
+        this.processingHistory.unshift(item);
+      }
+    },
+
     handleDownloadStarted(data) {
       this.showNotification(`Téléchargement démarré pour ${data.message}`, 'info')
-      this.addToHistory({
+      this.activeTaskId = data.taskId;
+      
+      this.addUniqueHistoryItem({
         description: `Started download: ${data.message}`,
         timestamp: new Date().toLocaleTimeString(),
         status: 'pending'
-      })
+      });
+      
       this.processingStatus = {
         text: 'Téléchargement en cours...',
         color: 'info'
@@ -162,12 +278,12 @@ export default {
         this.currentImage = result.files[0]
       }
       
-      this.addToHistory({
+      this.addUniqueHistoryItem({
         description: successMessage,
         timestamp: new Date().toLocaleTimeString(),
         status: 'success',
         files: result.files
-      })
+      });
       
       this.processingStatus = {
         text: 'Prêt pour le traitement',
@@ -183,22 +299,22 @@ export default {
       
       if (data.status === 'progress' && data.progress !== undefined && 
           (data.progress === 0 || data.progress % 25 === 0 || data.progress === 100)) {
-        this.addToHistory({
+        this.addUniqueHistoryItem({
           description: data.message,
           timestamp: new Date().toLocaleTimeString(),
           status: 'progress',
           progress: data.progress
-        })
+        });
       }
     },
 
     handleError(message) {
       this.showNotification(message, 'error')
-      this.addToHistory({
+      this.addUniqueHistoryItem({
         description: `Error: ${message}`,
         timestamp: new Date().toLocaleTimeString(),
         status: 'error'
-      })
+      });
       this.processingStatus = {
         text: 'Erreur',
         color: 'error'
@@ -210,11 +326,13 @@ export default {
         text: 'Traitement en cours...',
         color: 'info'
       }
-      this.addToHistory({
+      this.activeTaskId = params.taskId;
+      
+      this.addUniqueHistoryItem({
         description: `Applied ${params.workflow} processing`,
         timestamp: new Date().toLocaleTimeString(),
         status: 'success'
-      })
+      });
     },
 
     handleParameterUpdate(params) {
@@ -226,7 +344,7 @@ export default {
     },
 
     addToHistory(action) {
-      this.processingHistory.unshift(action)
+      this.addUniqueHistoryItem(action);
     },
 
     showNotification(text, color = 'info') {
@@ -244,6 +362,98 @@ export default {
         case 'pending': return 'warning'
         case 'progress': return 'info'
         default: return 'grey'
+      }
+    },
+
+    async checkTaskStatus() {
+      if (!this.activeTaskId) return;
+      
+      try {
+        // Récupérer le token d'authentification depuis le localStorage
+        const token = localStorage.getItem('token');
+        
+        // Ajouter le header d'authentification
+        const { data } = await axios.get(`/api/v1/tasks/${this.activeTaskId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log('Polling task status:', data);
+        
+        if (data.status === 'COMPLETED') {
+          this.processingStatus = {
+            text: 'Téléchargement terminé',
+            color: 'success'
+          };
+          
+          // Extraction du nombre de fichiers depuis le champ error
+          let nbFichiers = 0;
+          if (data.error && typeof data.error === 'string') {
+            const match = data.error.match(/(\d+) fichiers disponibles/);
+            if (match && match[1]) {
+              nbFichiers = parseInt(match[1], 10);
+            }
+          }
+          
+          // Restaurer l'ajout à l'historique avec le nombre correct de fichiers
+          this.addUniqueHistoryItem({
+            description: `Téléchargement terminé : ${nbFichiers} fichiers disponibles`,
+            timestamp: new Date().toLocaleTimeString(),
+            status: 'success',
+            files: [] // On n'a pas les chemins des fichiers individuels ici
+          });
+          
+          this.showNotification(`Téléchargement terminé : ${nbFichiers} fichiers disponibles`, 'success');
+          
+          // Arrêter le polling si la tâche est terminée
+          this.stopPolling();
+        } else if (data.status === 'FAILED') {
+          this.processingStatus = {
+            text: 'Erreur lors du téléchargement',
+            color: 'error'
+          };
+          
+          this.addUniqueHistoryItem({
+            description: data.error || 'Erreur lors du téléchargement',
+            timestamp: new Date().toLocaleTimeString(),
+            status: 'error'
+          });
+          
+          this.showNotification(data.error || 'Erreur lors du téléchargement', 'error');
+          
+          // Arrêter le polling en cas d'erreur
+          this.stopPolling();
+        }
+        // Les autres états (PENDING, RUNNING) sont déjà gérés
+      } catch (error) {
+        console.error('Erreur lors de la vérification du statut de la tâche:', error);
+      }
+    },
+
+    startPolling() {
+      if (this.pollingInterval) this.stopPolling();
+      this.pollingInterval = setInterval(() => {
+        this.checkTaskStatus();
+      }, 5000); // Vérifier toutes les 5 secondes
+    },
+    
+    stopPolling() {
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+      }
+    }
+  },
+  watch: {
+    activeTaskId(newId, oldId) {
+      console.log('activeTaskId changé:', newId);
+      if (newId) {
+        // Si une nouvelle tâche est active, démarrer le polling
+        this.startPolling();
+      } else {
+        // Si plus de tâche active, arrêter le polling
+        this.stopPolling();
       }
     }
   }

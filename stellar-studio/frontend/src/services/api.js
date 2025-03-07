@@ -2,8 +2,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
-// Utiliser une URL relative plutôt qu'une URL absolue pour éviter le problème de mixed content
-// Le proxy dans vite.config.js s'occupera de rediriger correctement
+// Utiliser une URL relative pour que le proxy dans vite.config.js fonctionne correctement
 const API_BASE_URL = '/api/v1';
 
 console.log('Configuration du client API avec baseURL relative:', API_BASE_URL);
@@ -24,8 +23,9 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
   }
   
-  // Débogage pour vérifier les URL construites
-  console.log('Requête API vers:', window.location.origin + config.baseURL + config.url);
+  // Éviter d'ajouter window.location.origin qui cause des redirections incorrectes
+  // et empêche le proxy Vite de fonctionner correctement
+  console.log('Requête API vers:', config.baseURL + config.url);
   
   return config
 })

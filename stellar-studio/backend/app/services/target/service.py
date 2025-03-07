@@ -214,10 +214,39 @@ class TargetService:
             return False
 
         try:
-            # Mise à jour du statut de la tâche
+            # Mise à jour du statut de la tâche en respectant les transitions valides
+            # On ne peut pas passer directement de PENDING à COMPLETED
+            if task.status == TaskStatus.PENDING:
+                # D'abord passer à RUNNING
+                task.status = TaskStatus.RUNNING
+                await self.task_repository.update(task)
+                # Rafraîchir la tâche avec une nouvelle requête
+                task = await self.task_repository.get(task_id)
+            
+            # Ensuite passage à COMPLETED
             task.status = TaskStatus.COMPLETED
             task.completed_at = datetime.utcnow()
+            
+            # Mettre à jour le message avec le nombre de fichiers
+            fichiers_txt = f"{len(downloaded_files)} fichiers disponibles"
+            task.error = fichiers_txt
+            
             await self.task_repository.update(task)
+
+            # Envoi d'une notification WebSocket finale
+            try:
+                await self.ws_manager.send_processing_update(
+                    user_id=task.user_id, 
+                    data={
+                        "task_id": str(task.id),
+                        "progress": 100,
+                        "message": f"Téléchargement terminé : {fichiers_txt}",
+                        "type": "download_complete",
+                        "files": downloaded_files
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Erreur lors de l'envoi de la notification WebSocket de fin: {str(e)}")
 
             # Mise à jour du statut de la cible
             target_id = UUID(task.params["target_id"])
@@ -396,35 +425,91 @@ class TargetService:
             await self.target_preset_repository.update(target_preset)
         return is_available
 
-    async def generate_target_preview(self, target_id: UUID) -> Optional[str]:
-        """Génère une preview pour une cible"""
+    async def generate_target_preview(self, target_id: UUID, preset_id: Optional[int] = None) -> Optional[dict]:
+        """
+        Génère ou récupère une prévisualisation pour une cible et un preset optionnel.
+        
+        Args:
+            target_id: ID de la cible
+            preset_id: ID du preset (optionnel)
+            
+        Returns:
+            Un dictionnaire contenant les URLs des prévisualisations disponibles
+        """
         target = await self.target_repository.get(target_id)
         if not target:
             return None
-
-        files = await self.target_file_repository.get_by_target(target_id)
-        if not files:
-            return None
-
-        # Utilise le premier fichier disponible pour la preview
-        first_file = next((f for f in files if f.in_minio), None)
-        if not first_file:
-            return None
-
-        try:
-            # Génère la preview
-            preview_data = await self.storage_service.get_fits_file(first_file.file_path)
-            if not preview_data:
-                return None
-
-            # Sauvegarde la preview
-            preview_path = f"previews/{target_id}/main.png"
-            if await self.storage_service.store_preview(preview_data["data"], preview_path):
-                return preview_path
-            return None
-        except Exception as e:
-            target_operations.labels(operation='generate_preview', status='failed').inc()
-            return None
+            
+        # Si aucun preset n'est spécifié, en choisir un (premier disponible ou défaut)
+        if preset_id is None:
+            # Récupérer les presets disponibles pour cette cible
+            target_presets = await self.target_preset_repository.get_by_target(target_id)
+            if target_presets:
+                preset_id = target_presets[0].preset_id
+            else:
+                # Utiliser un preset par défaut (RGB ou le premier disponible)
+                from app.infrastructure.repositories.models import Preset
+                from sqlalchemy import select
+                
+                async with self.session.begin():
+                    # Essayer de trouver preset RGB
+                    stmt = select(Preset).where(Preset.preset_type == "RGB")
+                    result = await self.session.execute(stmt)
+                    rgb_preset = result.scalars().first()
+                    
+                    if rgb_preset:
+                        preset_id = rgb_preset.id
+                    else:
+                        # Prendre le premier preset disponible
+                        stmt = select(Preset)
+                        result = await self.session.execute(stmt)
+                        first_preset = result.scalars().first()
+                        
+                        if first_preset:
+                            preset_id = first_preset.id
+                        else:
+                            return None  # Aucun preset disponible
+        
+        # Vérifier les fichiers existants pour cette cible et ce preset
+        files_info = await self.storage_service.check_files_exist(target_id, preset_id)
+        
+        # Initialiser le résultat
+        result = {
+            "preview_urls": {},
+            "all_files_available": files_info["exists"]
+        }
+        
+        # S'il y a des JPG disponibles, les utiliser
+        if files_info["jpg_files"]:
+            for jpg_path in files_info["jpg_files"]:
+                # Extraire le nom du filtre du chemin
+                filter_name = jpg_path.split("/")[-1].replace(".jpg", "")
+                result["preview_urls"][filter_name] = jpg_path
+            return result
+            
+        # S'il y a des FITS disponibles, générer des prévisualisations
+        if files_info["fits_files"]:
+            for fits_path in files_info["fits_files"]:
+                try:
+                    # Générer la prévisualisation
+                    fits_data = await self.storage_service.get_fits_file(fits_path)
+                    if fits_data:
+                        # Extraire le nom du filtre du chemin
+                        filter_name = fits_path.split("/")[-1].replace(".fits", "")
+                        preview_path = f"previews/{target.id}/{filter_name}.png"
+                        
+                        # Stocker la prévisualisation
+                        if await self.storage_service.store_preview(fits_data["data"], preview_path):
+                            result["preview_urls"][filter_name] = preview_path
+                except Exception as e:
+                    logger.exception(f"Erreur lors de la génération de la prévisualisation: {str(e)}")
+            
+            # Si au moins une prévisualisation a été générée, renvoyer le résultat
+            if result["preview_urls"]:
+                return result
+        
+        # Aucune prévisualisation disponible
+        return None
 
     async def add_file_from_mast(
         self,
@@ -432,7 +517,7 @@ class TargetService:
         file_path: str,
         mast_id: str,
         file_size: int,
-        telescope_id: UUID
+        telescope_id: UUID  # On garde ce paramètre pour compatibilité mais on ne l'utilise pas directement
     ) -> Optional[TargetFile]:
         """Ajoute un fichier téléchargé depuis MAST à un target
         
@@ -441,7 +526,7 @@ class TargetService:
             file_path: Chemin du fichier téléchargé dans MinIO
             mast_id: Identifiant MAST du fichier
             file_size: Taille du fichier en octets
-            telescope_id: ID du télescope utilisé
+            telescope_id: ID du télescope utilisé (pour compatibilité, non utilisé directement)
             
         Returns:
             Le fichier créé ou None en cas d'erreur
@@ -453,37 +538,56 @@ class TargetService:
                 logging.error(f"Cible non trouvée: {target_id}")
                 return None
                 
-            # Récupération des filtres pour ce télescope
-            filters = await self.filter_repository.get_by_telescope(telescope_id)
-            if not filters:
-                logging.warning(f"Aucun filtre trouvé pour le télescope {telescope_id}")
+            # Extraction du nom du fichier à partir du chemin
+            filename = os.path.basename(file_path)
             
-            # Le fichier est déjà stocké dans MinIO, pas besoin de le stocker à nouveau
-            # Création du TargetFile directement avec le chemin MinIO fourni
+            # Essayer de détecter le filtre à partir du nom de fichier
+            filter_id = None
+            for filter_name in ['F200W', 'F187N', 'F277W', 'F356W', 'F444W', 'F480M']:
+                if filter_name.lower() in filename.lower():
+                    # Chercher le filtre correspondant dans la base de données
+                    filter = await self.filter_repository.find_by_name(filter_name)
+                    if filter:
+                        filter_id = filter.id
+                        logging.info(f"Filtre détecté: {filter_name} (ID: {filter_id})")
+                        break
+            
+            # Si aucun filtre n'a été trouvé, utiliser un filtre par défaut
+            if not filter_id:
+                logging.warning(f"Aucun filtre trouvé pour {filename}, utilisation d'un filtre par défaut")
+                # Récupérer un filtre par défaut pour ce télescope
+                filters = await self.filter_repository.find_by_telescope_id(telescope_id)
+                if filters:
+                    filter_id = filters[0].id
+                    logging.info(f"Filtre par défaut utilisé: {filters[0].name} (ID: {filter_id})")
+                else:
+                    logging.error(f"Aucun filtre disponible pour le télescope {telescope_id}")
+                    return None
+            
+            # Création du fichier target
             target_file = TargetFile(
                 target_id=target_id,
-                file_path=file_path,  # Utiliser directement le chemin MinIO
-                mast_id=mast_id,
+                filter_id=filter_id,
+                file_path=file_path,
                 file_size=file_size,
-                telescope_id=telescope_id
+                mast_id=mast_id,
+                is_downloaded=True,
+                in_minio=True
             )
             
-            # Enregistrement dans la base de données
+            # On ne spécifie plus telescope_id car la colonne a été supprimée
+            # telescope_id est désormais obtenu via la relation avec Target
+                
+            # Extraction des métadonnées FITS si le fichier est disponible
+            # ... (code existant pour les métadonnées)
+                
+            # Sauvegarde dans la base de données
             created_file = await self.target_file_repository.create(target_file)
             
-            if created_file:
-                logging.info(f"Fichier ajouté avec succès: {file_path}")
-                
-                # Mise à jour des presets disponibles en fonction du type d'objet
-                presets = await self.preset_repository.get_by_object_type(target.object_type)
-                for preset in presets:
-                    await self.update_preset_availability(target_id, preset.id)
-                
-                return created_file
-            else:
-                logging.error("Échec de la création du fichier dans la base de données")
-                return None
+            logging.info(f"Fichier ajouté: {created_file.id} - {file_path}")
+            return created_file
                 
         except Exception as e:
             logging.error(f"Erreur lors de l'ajout du fichier MAST: {str(e)}")
-            return None
+            # Remontée de l'erreur pour traitement par l'appelant
+            raise

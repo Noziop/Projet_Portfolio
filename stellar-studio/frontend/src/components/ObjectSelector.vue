@@ -48,8 +48,9 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import apiClient from '../services/api'
+import websocketService, { createWebSocket } from '../services/websocket'
 
 export default {
   name: 'ObjectSelector',
@@ -66,6 +67,39 @@ export default {
     const loadingPresets = ref(false)
     const downloadLoading = ref(false)
     const downloadStatus = ref('idle') // 'idle', 'downloading', 'success', 'error'
+    const currentTaskId = ref(null)
+
+    // Gestionnaire pour les messages WebSocket - avec sécurité
+    const handleWebSocketMessage = (data) => {
+      try {
+        console.log('Message WebSocket reçu dans ObjectSelector:', data);
+        
+        // Vérifier si c'est bien un objet avec les propriétés attendues
+        if (!data || typeof data !== 'object') return;
+        
+        // Vérifier si le message concerne la tâche en cours
+        if (data.task_id === currentTaskId.value) {
+          if (data.type === 'download_progress') {
+            // Message de progression
+            emit('download-progress', {
+              status: 'progress',
+              progress: data.progress,
+              message: data.message
+            });
+          } else if (data.type === 'download_complete') {
+            // Téléchargement terminé
+            downloadStatus.value = 'success';
+            emit('download-complete', {
+              target_id: selectedTarget.value,
+              files: data.files || [],
+              message: data.message
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors du traitement du message WebSocket:', error);
+      }
+    };
 
     // Récupération des télescopes disponibles depuis l'API
     const loadTelescopes = async () => {
@@ -73,9 +107,8 @@ export default {
       try {
         console.log("Tentative de récupération des télescopes via:", apiClient.defaults.baseURL);
         
-        // Forcer HTTPS pour résoudre le problème de mixed content
+        // Utiliser le proxy correctement avec une URL relative
         const url = '/telescopes/';
-        console.log("URL complète:", window.location.origin + apiClient.defaults.baseURL + url);
         
         const response = await apiClient.get(url, { 
           params: { status: 'online' }
@@ -205,11 +238,17 @@ export default {
           telescope_id: selectedTelescope.value
         })
         
+        // Stocker l'ID de la tâche en cours
+        currentTaskId.value = response.data.task_id;
+        
+        // Lors du téléchargement, émettre l'événement avec toutes les informations nécessaires
         emit('download-started', {
           taskId: response.data.task_id,
-          message: `Téléchargement démarré pour ${target.name}`
+          message: target.name || target.id,
+          // Ajouter d'autres informations utiles ici
         })
         
+        // Garder le monitoring par polling comme fallback
         monitorDownload(response.data.task_id)
       } catch (error) {
         console.error('Échec du démarrage du téléchargement:', error)
@@ -233,11 +272,10 @@ export default {
           // Gestion des différents états
           if (status === 'COMPLETED') {
             downloadStatus.value = 'success'
-            emit('download-complete', {
-              target_id: response.data.params.target_id,
-              files: response.data.result?.files || [],
-              message: `Téléchargement terminé : ${progressInfo}`
-            })
+            
+            // Ne pas émettre download-complete ici, le polling dans Processing.vue s'en occupe
+            // avec les informations correctes sur le nombre de fichiers
+            
             return true
           } else if (status === 'FAILED') {
             downloadStatus.value = 'error'
@@ -290,6 +328,25 @@ export default {
     // Charger les télescopes au montage du composant
     onMounted(() => {
       loadTelescopes()
+      
+      // Les WebSockets sont désactivés, mais on garde le code au cas où on en aurait besoin plus tard
+      try {
+        // Ajouter l'écouteur mais sans activer les WebSockets
+        websocketService.addListener('processing_update', handleWebSocketMessage);
+        console.log('Écouteur WebSocket enregistré (mode désactivé)');
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation WebSocket:', error);
+      }
+    })
+    
+    // Nettoyer les écouteurs WebSocket à la destruction du composant
+    onUnmounted(() => {
+      try {
+        websocketService.removeListener('processing_update', handleWebSocketMessage);
+        console.log('Écouteur WebSocket supprimé');
+      } catch (error) {
+        console.error('Erreur lors du nettoyage WebSocket:', error);
+      }
     })
 
     return {

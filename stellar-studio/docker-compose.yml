@@ -105,6 +105,7 @@ services:
       dockerfile: Dockerfile.celery
     environment:
     - PYTHONPATH=/app
+    - CELERY_WORKER_ID=${WORKER_INDEX:-0}
     volumes:
       - ./backend:/app
       - ./tmp:/app/tmp
@@ -112,8 +113,9 @@ services:
       - .env
     command: >
       celery -A app.core.celery worker 
-      -Q download 
+      -Q download
       --loglevel=info
+      --concurrency=1
     depends_on:
       redis:
         condition: service_healthy
@@ -124,6 +126,9 @@ services:
       replicas: 4
       restart_policy:
         condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.core.celery inspect ping"]
       interval: 30s

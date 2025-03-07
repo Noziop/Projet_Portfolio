@@ -1,6 +1,6 @@
-import axios from 'axios'
+import apiClient from './api'
 
-const API_URL = '/api/v1/auth'
+const AUTH_URL = '/auth'
 
 class AuthService {
     async login(username, password) {
@@ -8,7 +8,7 @@ class AuthService {
         formData.append('username', username);
         formData.append('password', password);
         
-        const response = await axios.post(`${API_URL}/login`, formData, {
+        const response = await apiClient.post(`${AUTH_URL}/login`, formData, {
             headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
             }
@@ -18,17 +18,17 @@ class AuthService {
       
 
   async register(userData) {
-    const response = await axios.post(`${API_URL}/register`, userData)
+    const response = await apiClient.post(`${AUTH_URL}/register`, userData)
     return response.data
   }
 
   async getMe() {
-    const response = await axios.get(`${API_URL}/me`)
+    const response = await apiClient.get(`${AUTH_URL}/me`)
     return response.data
   }
 
   async changePassword(oldPassword, newPassword) {
-    const response = await axios.post(`${API_URL}/password`, {
+    const response = await apiClient.post(`${AUTH_URL}/password`, {
       old_password: oldPassword,
       new_password: newPassword
     })
@@ -37,9 +37,9 @@ class AuthService {
 
   setAuthHeader(token) {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
     } else {
-      delete axios.defaults.headers.common['Authorization']
+      delete apiClient.defaults.headers.common['Authorization']
     }
   }
 }
