@@ -62,3 +62,4 @@ backend/tmp/*
 @eaDir/
 *@eaDir*
 backend/z_export/
+z_export/
