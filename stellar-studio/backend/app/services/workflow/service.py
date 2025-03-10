@@ -27,8 +27,9 @@ from app.domain.value_objects.task_types import TaskType, TaskStatus
 from app.domain.value_objects.processing_types import ProcessingStepType
 
 from app.services.storage.service import StorageService
-from app.tasks.processing.tasks import (
-    process_hoo_preset, 
+from app.tasks.processing import (
+    process_hoo_preset,
+    process_rgb_preset,  # Nouvelle tâche que nous avons ajoutée
     generate_channel_previews, 
     wait_user_validation
 )
@@ -137,8 +138,10 @@ class WorkflowService:
 
             # Lancement des tâches Celery
             chain(
-                generate_channel_previews.s(),
-                wait_user_validation.s()
+                generate_channel_previews.s(str(task.id), str(target_id)),
+                wait_user_validation.s(str(job.id)),
+                # Choisir le preset en fonction du nom
+                process_hoo_preset.s(str(job.id), str(target_id), {}) if preset.name == "HOO" else process_rgb_preset.s(str(job.id), str(target_id), {})
             ).apply_async()
 
             workflow_operations.labels(operation='start', status='success').inc()
@@ -160,7 +163,7 @@ class WorkflowService:
         job = await self.processing_repository.get(job_id)
         if not job:
             return None
-
+        
         task = await self.task_repository.get(job.task_id)
         return {
             "status": task.status,

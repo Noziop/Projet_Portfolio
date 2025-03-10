@@ -3,7 +3,7 @@ from celery import shared_task
 from app.core.celery import celery_app
 
 # Import des fonctions de tâches depuis les modules appropriés
-from app.tasks.processing.tasks import process_hoo_preset, generate_channel_previews, wait_user_validation
+from app.tasks.processing import process_hoo_preset, generate_channel_previews, wait_user_validation
 
 # Configuration commune pour toutes les tâches
 common_options = {
