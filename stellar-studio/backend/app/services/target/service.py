@@ -26,13 +26,14 @@ from app.infrastructure.repositories.models.target import Target
 from app.infrastructure.repositories.models.target_file import TargetFile
 from app.infrastructure.repositories.models.preset import Preset
 from app.infrastructure.repositories.models.task import Task
+from app.infrastructure.repositories.models.filter import Filter
 from app.infrastructure.repositories.models.target_preset import TargetPreset
 
 from app.domain.value_objects.target_types import ObjectType, TargetStatus
 from app.domain.value_objects.task_types import TaskType, TaskStatus
 
 from app.services.storage.service import StorageService
-from app.tasks.processing.tasks import process_hoo_preset, generate_channel_previews, wait_user_validation
+from app.tasks.processing import process_hoo_preset, generate_channel_previews, wait_user_validation
 
 # Métriques Prometheus
 target_operations = Counter(
@@ -52,6 +53,8 @@ active_downloads = Gauge(
     'active_downloads',
     'Number of active downloads'
 )
+
+logger = logging.getLogger(__name__)
 
 class TargetService:
     def __init__(
@@ -116,12 +119,18 @@ class TargetService:
         preset_id: UUID,
         telescope_id: UUID
     ) -> Optional[Task]:
-        """Lance le téléchargement des fichiers depuis MAST pour une cible et un preset.
-        """
-        from app.tasks.download.tasks import download_mast_files  # Import local pour éviter les imports circulaires
+        """Lance le téléchargement des fichiers depuis MAST pour une cible et un preset."""
+        import logging
+        logger = logging.getLogger("app.services.target")
         
+        # Import local vers le nouveau module workflow
+        from app.tasks.download.workflow import download_mast_files
+        
+        logger.info(f"🚀 Démarrage du téléchargement: target={target_id}, telescope={telescope_id}")
         target_processing_duration.labels(operation='download_start').time()
+        
         try:
+            # Vérification des entités - garder le code asynchrone ici
             target = await self.target_repository.get(target_id)
             preset = await self.preset_repository.get(preset_id)
             
@@ -136,6 +145,7 @@ class TargetService:
             if telescope_id is None:
                 if target.telescope_id:
                     telescope_id = target.telescope_id
+                    logger.info(f"Utilisation du télescope associé à la cible: {telescope_id}")
                 else:
                     await self.ws_manager.send_error(
                         user_id,
@@ -143,7 +153,7 @@ class TargetService:
                     )
                     return None
 
-            # Création de la tâche
+            # Création de la tâche - asynchrone également
             task = Task(
                 type=TaskType.DOWNLOAD,
                 status=TaskStatus.PENDING,
@@ -155,6 +165,7 @@ class TargetService:
                 }
             )
             task = await self.task_repository.create(task)
+            logger.info(f"Tâche créée: {task.id}")
 
             # Notification WebSocket du démarrage
             await self.ws_manager.send_processing_update(
@@ -162,28 +173,42 @@ class TargetService:
                 create_download_started_event(str(target_id))
             )
 
-            # Chaînage des tâches Celery : téléchargement suivi de la génération des previews
-            task_chain = chain(
-                download_mast_files.s(
-                    str(task.id),
-                    str(target_id),
-                    str(telescope_id)
-                ),
-                generate_channel_previews.s()  # Génère une preview pour chaque canal
+            # PARTIE CRITIQUE: Lancement de la tâche Celery
+            # Utilisation des paramètres nommés pour plus de clarté
+            # Conversion explicite de tous les paramètres en chaînes
+            task_id_str = str(task.id)
+            target_id_str = str(target_id)
+            telescope_id_str = str(telescope_id)
+            
+            logger.info(f"Lancement de la tâche Celery avec: task_id={task_id_str}")
+            print(f"Lancement de la tâche Celery avec: task_id={task_id_str}")
+            
+            # Détacher complètement la tâche du contexte actuel
+            download_mast_files.apply_async(
+                kwargs={
+                    "task_id": task_id_str,
+                    "target_id": target_id_str,
+                    "preset_id": str(preset_id),
+                    "telescope_id": telescope_id_str
+                },
+                task_id=task_id_str,
+                countdown=1  # Petit délai pour s'assurer que tout est bien commité
             )
-            task_chain.delay()
 
+            logger.info(f"Tâche Celery lancée avec succès: {task_id_str}")
             active_downloads.inc()
             target_operations.labels(operation='download_start', status='success').inc()
             return task
 
         except Exception as e:
+            logger.error(f"❌ Erreur lors du lancement du téléchargement: {str(e)}")
             target_operations.labels(operation='download_start', status='failed').inc()
             await self.ws_manager.send_error(
                 user_id,
                 f"Erreur lors du lancement du téléchargement: {str(e)}"
             )
             return None
+
 
     async def update_download_progress(
         self,
@@ -510,6 +535,72 @@ class TargetService:
         
         # Aucune prévisualisation disponible
         return None
+
+    def add_file_from_mast_sync(
+        self,
+        target_id: UUID,
+        file_path: str,
+        mast_id: str,
+        file_size: int,
+        telescope_id: UUID
+    ) -> Optional[TargetFile]:
+        """Version synchrone de add_file_from_mast pour les tâches Celery"""
+        try:
+            # Récupération de la cible (synchrone)
+            target = self.session.query(Target).get(target_id)
+            if not target:
+                logging.error(f"Cible non trouvée: {target_id}")
+                return None
+                
+            # Extraction du nom du fichier à partir du chemin
+            filename = os.path.basename(file_path)
+            
+            # Essayer de détecter le filtre à partir du nom de fichier
+            filter_id = None
+            for filter_name in ['F200W', 'F187N', 'F277W', 'F356W', 'F444W', 'F480M']:
+                if filter_name.lower() in filename.lower():
+                    # Chercher le filtre correspondant (synchrone)
+                    filter = self.session.query(Filter).filter(Filter.name == filter_name).first()
+                    if filter:
+                        filter_id = filter.id
+                        logging.info(f"Filtre détecté: {filter_name} (ID: {filter_id})")
+                        break
+            
+            # Si aucun filtre n'a été trouvé, utiliser un filtre par défaut
+            if not filter_id:
+                logging.warning(f"Aucun filtre trouvé pour {filename}, utilisation d'un filtre par défaut")
+                # Récupérer un filtre par défaut pour ce télescope (synchrone)
+                filters = self.session.query(Filter).filter(Filter.telescope_id == telescope_id).all()
+                if filters:
+                    filter_id = filters[0].id
+                    logging.info(f"Filtre par défaut utilisé: {filters[0].name} (ID: {filter_id})")
+                else:
+                    logging.error(f"Aucun filtre disponible pour le télescope {telescope_id}")
+                    return None
+            
+            # Création du fichier target
+            target_file = TargetFile(
+                target_id=target_id,
+                filter_id=filter_id,
+                file_path=file_path,
+                file_size=file_size,
+                mast_id=mast_id,
+                is_downloaded=True,
+                in_minio=True
+            )
+            
+            # Sauvegarde synchrone dans la base de données
+            self.session.add(target_file)
+            self.session.commit()
+            
+            logging.info(f"Fichier ajouté (sync): {target_file.id} - {file_path}")
+            return target_file
+                
+        except Exception as e:
+            logging.error(f"Erreur lors de l'ajout du fichier MAST (sync): {str(e)}")
+            # Rollback en cas d'erreur
+            self.session.rollback()
+            return None
 
     async def add_file_from_mast(
         self,

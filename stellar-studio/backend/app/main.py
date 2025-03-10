@@ -3,17 +3,23 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import json
+import asyncio
+from uuid import UUID
+
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.core.monitoring import setup_monitoring
 from app.services.storage.service import StorageService
 from app.db.init_db import init_db
+from app.api.v1.endpoints.ws.connection import manager
 
 # Configuration du logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -43,6 +49,11 @@ async def root():
         "docs_url": "/docs",
         "version": "1.0.0"
     }
+
+@app.get("/test-route")
+async def test_route():
+    return {"status": "ok"}
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -119,6 +130,64 @@ async def startup_event():
         logger.error(f"Erreur lors de la suppression du fichier de test local: {e}")
 
     logger.info("--- Fin du test StorageService ---")
+    
+    # Démarrage de l'écouteur Redis pour les WebSockets
+    logger.info("🔌 Démarrage de l'écouteur Redis pour les WebSockets...")
+    asyncio.create_task(listen_to_redis())
+
+async def listen_to_redis():
+    """Écoute les messages Redis et les transmet aux clients WebSocket"""
+    import aioredis
+    
+    # Créer une connexion Redis dédiée pour le pubsub
+    redis = await aioredis.from_url(settings.REDIS_URL)
+    pubsub = redis.pubsub()
+    
+    # S'abonner au canal des notifications WebSocket
+    pattern = "ws_notifications:*"
+    await pubsub.psubscribe(pattern)
+    logger.info(f"✅ Écouteur Redis abonné au canal: {pattern}")
+    
+    # Boucle d'écoute des messages
+    try:
+        while True:
+            message = await pubsub.get_message(ignore_subscribe_messages=True)
+            if message and message["type"] == "pmessage":
+                # Extraire l'ID utilisateur du canal
+                channel = message["channel"].decode("utf-8")
+                user_id = channel.split(":")[-1]
+                
+                # Décoder et traiter le message
+                try:
+                    payload = json.loads(message["data"].decode("utf-8"))
+                    message_type = payload.get("type")
+                    
+                    # Log coloré pour la démo
+                    logger.info(f"🚀 Message WebSocket reçu via Redis: {message_type} pour user {user_id}")
+                    
+                    # Dispatcher le message selon son type
+                    if message_type == "processing_update":
+                        await manager.send_processing_update(UUID(user_id), payload.get("data", {}))
+                    elif message_type == "error":
+                        await manager.send_error(UUID(user_id), payload.get("message", "Erreur inconnue"))
+                    elif message_type == "preview":
+                        await manager.send_preview(UUID(user_id), payload.get("data", {}))
+                    else:
+                        # Fallback pour les autres types de messages
+                        await manager.active_connections[UUID(user_id)].send_json(payload)
+                        
+                except json.JSONDecodeError:
+                    logger.error(f"❌ Erreur de décodage JSON pour le message Redis: {message}")
+                except Exception as e:
+                    logger.error(f"❌ Erreur lors du traitement du message WebSocket: {str(e)}")
+            
+            # Petite pause pour éviter de surcharger le CPU
+            await asyncio.sleep(0.01)
+    except Exception as e:
+        logger.error(f"❌ Erreur dans l'écouteur Redis: {str(e)}")
+        # Reconnexion en cas d'erreur
+        await asyncio.sleep(5)
+        asyncio.create_task(listen_to_redis())  # Redémarrer l'écouteur
 
 @app.on_event("shutdown")
 async def shutdown_event():

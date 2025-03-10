@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   traefik:
     image: traefik:v2.5
@@ -23,7 +25,6 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
     user: "65534:65534"
     volumes:
       - ./docker/prometheus:/etc/prometheus:ro
@@ -40,16 +41,18 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.stellarstudio.fassih.ch`)"
       - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.middlewares.auth-prometheus.basicAuth.users=${PROMETHEUS_USERNAME}:${PROMETHEUS_PASSWORD_HASH}"
+      - "traefik.http.routers.prometheus.middlewares=auth-prometheus"
     depends_on:
       - backend
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.70
 
   grafana:
     image: grafana/grafana-oss
-    container_name: grafana
     restart: unless-stopped
     volumes:
       - grafana-data:/var/lib/grafana
@@ -66,10 +69,14 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.11
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=Host(`api.stellarstudio.fassih.ch`)"
@@ -86,6 +93,18 @@ services:
         condition: service_healthy
       database:
         condition: service_healthy
+      traefik:
+        condition: service_started
+      celery-exporter:
+        condition: service_started
+      mariadb-exporter:
+        condition: service_started
+      redis-exporter:
+        condition: service_started
+      node-exporter:
+        condition: service_started
+      minio:
+        condition: service_started
     deploy:
       mode: replicated
       replicas: 2
@@ -97,12 +116,14 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - traefik_network
+      traefik_network:
 
   celery-download:
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     environment:
     - PYTHONPATH=/app
     - CELERY_WORKER_ID=${WORKER_INDEX:-0}
@@ -113,7 +134,7 @@ services:
       - .env
     command: >
       celery -A app.core.celery worker 
-      -Q download
+      -Q download,download_files
       --loglevel=info
       --concurrency=1
     depends_on:
@@ -121,6 +142,24 @@ services:
         condition: service_healthy
       database:
         condition: service_healthy
+      traefik:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
+      celery-exporter:
+        condition: service_started
+      mariadb-exporter:
+        condition: service_started
+      redis-exporter:
+        condition: service_started
+      node-exporter:
+        condition: service_started
+      minio:
+        condition: service_started
+      frontend:
+        condition: service_started
     deploy:
       mode: replicated
       replicas: 4
@@ -136,12 +175,14 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - traefik_network
+      traefik_network:
 
   celery-processing:
     build:
       context: ./backend
       dockerfile: Dockerfile.celery
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     environment:
     - PYTHONPATH=/app
     volumes:
@@ -158,6 +199,24 @@ services:
         condition: service_healthy
       database:
         condition: service_healthy
+      traefik:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      grafana:
+        condition: service_started
+      celery-exporter:
+        condition: service_started
+      mariadb-exporter:
+        condition: service_started
+      redis-exporter:
+        condition: service_started
+      node-exporter:
+        condition: service_started
+      minio:
+        condition: service_started
+      frontend:
+        condition: service_started
     deploy:
       mode: replicated
       replicas: 4
@@ -170,7 +229,7 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - traefik_network
+      traefik_network:
 
   celery-exporter:
     image: grafana/celery-exporter
@@ -184,7 +243,8 @@ services:
       - CELERY_QUEUE_NAME_MAPPING=download:download,processing:processing
       - CELERY_WORKER_NAME_MAPPING=celery-download:download,celery-processing:processing
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.15
 
   minio:
     image: minio/minio:latest
@@ -221,7 +281,10 @@ services:
         ipv4_address: 172.18.0.6
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`stellarstudio.fassih.ch`)"
@@ -235,7 +298,8 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.16
 
   database:
     image: mariadb:10.5
@@ -254,7 +318,8 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.8
 
   mariadb-exporter:
     image: prom/mysqld-exporter
@@ -275,7 +340,8 @@ services:
       database:
         condition: service_healthy
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.17
 
   redis:
     image: redis:7-alpine
@@ -291,16 +357,19 @@ services:
     env_file:
       - .env
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.9
 
   redis-exporter:
     image: oliver006/redis_exporter
     command: --redis.addr=redis://redis:6379
     networks:
-      - traefik_network
+      traefik_network:
+        ipv4_address: 172.18.0.19
 
   node-exporter:
     image: prom/node-exporter
+    container_name: node-exporter
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -312,7 +381,6 @@ services:
     networks:
       traefik_network:
         ipv4_address: 172.18.0.18
-
 
 volumes:
   grafana-data:

@@ -68,3 +68,14 @@ class FilterRepository(BaseRepository[Filter]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def find_by_name(self, name: str) -> Optional[Filter]:
+        """Récupère un filtre par son nom"""
+        query = select(Filter).where(Filter.name == name)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def find_by_telescope_id(self, telescope_id: UUID) -> List[Filter]:
+        """Récupère tous les filtres associés à un télescope donné"""
+        query = select(Filter).where(Filter.telescope_id == str(telescope_id))
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

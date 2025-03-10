@@ -132,7 +132,7 @@ export default {
       processingHistory: [],
       processingStatus: null,
       activeTaskId: null,
-      enableWebSocket: false, // WebSocket désactivé par défaut
+      enableWebSocket: true, // WebSocket désactivé par défaut
       snackbar: {
         show: false,
         text: '',

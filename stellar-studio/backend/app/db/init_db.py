@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
 from app.db.base_class import Base
-from app.db.session import engine, AsyncSessionLocal
+from app.db.session import async_engine, AsyncSessionLocal
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.domain.value_objects.user_types import UserRole, UserLevel
@@ -33,7 +33,7 @@ async def init_db():
     """Initialise la base de données et seed les données initiales"""
     try:
         # Création des tables
-        async with engine.begin() as conn:
+        async with async_engine.begin() as conn:
             logger.info("Création des tables...")
             await conn.run_sync(lambda x: Base.metadata.create_all(x, checkfirst=True))
         

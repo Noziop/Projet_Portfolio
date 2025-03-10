@@ -156,3 +156,10 @@ class TelescopeRepository(BaseRepository[SpaceTelescope]):
         
         logger.debug(f"DB: get_by_name query executed in {time.time() - start_time:.3f}s")
         return telescope
+    
+    # Méthodes synchrones pour Celery
+    def get_sync(self, telescope_id: str) -> Optional[SpaceTelescope]:
+        """Récupère un télescope par son ID (version synchrone)"""
+        query = select(SpaceTelescope).where(SpaceTelescope.id == telescope_id)
+        result = self.session.execute(query)
+        return result.scalar_one_or_none()

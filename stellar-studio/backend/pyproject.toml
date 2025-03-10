@@ -28,6 +28,7 @@ scipy = "^1.11.0"
 python-dotenv = "^1.0.0"
 kombu = "^5.3.5"
 aiomysql = "^0.2.0"
+pymysql = "1.1.0"
 mysql-connector-python = "^8.0.0"
 websockets = "^11.0.0"  # Pour le support WebSocket
 aioredis = "^2.0.0"    # Pour la gestion des connexions WebSocket via Redis

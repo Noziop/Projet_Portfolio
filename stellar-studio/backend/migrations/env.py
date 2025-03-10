@@ -26,7 +26,13 @@ except Exception as e:
     print(f"Error importing models: {e}")
 
 def get_url():
-    return "mysql+mysqlconnector://stellaruser:stellarpassword@database:3306/stellarstudio"
+    user = os.getenv("DATABASE_USER")
+    password = os.getenv("DATABASE_PASSWORD", "bwahahaha_not_a_good_password")
+    host = os.getenv("DATABASE_HOST")
+    port = os.getenv("DATABASE_PORT")
+    db = os.getenv("DATABASE_NAME")
+    return f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{db}"
+
 
 config = context.config
 
