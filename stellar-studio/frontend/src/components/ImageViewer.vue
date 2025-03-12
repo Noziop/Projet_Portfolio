@@ -2,9 +2,9 @@
   <div class="image-viewer">
     <v-progress-circular v-if="loading" indeterminate color="primary"></v-progress-circular>
     
-    <v-card v-else-if="currentImage" class="mx-auto" max-width="700">
+    <v-card v-else-if="imageUrl" class="mx-auto" max-width="700">
       <v-img
-        :src="`/api/v1/targets/${targetId}/preview/${currentImage}`"
+        :src="imageUrl"
         height="400"
         contain
         class="grey lighten-2"
@@ -16,7 +16,7 @@
         </template>
       </v-img>
       
-      <v-card-title class="text-center">{{ getFilterDisplayName(currentImage) }}</v-card-title>
+      <v-card-title class="text-center">{{ getFilterDisplayName(selectedFilter) }}</v-card-title>
     </v-card>
     
     <v-alert v-else type="info" outlined>
@@ -32,7 +32,7 @@ export default {
   props: {
     targetId: String,
     selectedFilter: String,
-    availableFilters: Array
+    'image-url': String  // Reçoit directement l'URL présignée du parent
   },
   
   data() {
@@ -44,16 +44,8 @@ export default {
   },
   
   computed: {
-    currentImage() {
-      if (!this.selectedFilter || !this.previewUrls) return null;
-      
-      // Chercher une URL qui contient le filtre sélectionné
-      const keys = Object.keys(this.previewUrls);
-      const matchingKey = keys.find(key => 
-        key.toLowerCase().includes(this.selectedFilter.toLowerCase())
-      );
-      
-      return matchingKey ? this.previewUrls[matchingKey] : null;
+    imageUrl() {
+      return this['image-url'];
     }
   },
   
@@ -64,14 +56,13 @@ export default {
       this.loading = true;
       
       try {
+        console.log('Chargement des prévisualisations pour la cible', this.targetId);
         const response = await fetch(`/api/v1/targets/${this.targetId}/preview`);
         const data = await response.json();
         
         this.previewUrls = data.preview_urls || {};
-        this.$emit('previews-loaded', {
-          filters: Object.keys(this.previewUrls),
-          count: Object.keys(this.previewUrls).length
-        });
+        this.$emit('previews-loaded', data);
+        console.log('Prévisualisations chargées:', this.previewUrls);
       } catch (error) {
         console.error('Erreur de chargement des prévisualisations:', error);
         this.error = error.message;
@@ -80,9 +71,11 @@ export default {
       }
     },
     
-    getFilterDisplayName(imageUrl) {
+    getFilterDisplayName(filterName) {
+      if (!filterName) return 'Image prévisualisée';
+      
       // Extraire le nom du filtre pour un affichage plus convivial
-      const filterMatch = imageUrl.match(/_(f\d+\w+)_/i);
+      const filterMatch = filterName.match(/_(f\d+\w+)_/i);
       if (filterMatch) {
         const filter = filterMatch[1].toUpperCase();
         
@@ -113,6 +106,13 @@ export default {
   },
   
   mounted() {
+    console.log("ImageViewer monté avec targetId =", this.targetId);
+    if (this.targetId) {
+      this.loadPreviews();
+    } else {
+      console.warn("targetId est vide, appel API impossible!");
+    }
+
     if (this.targetId) {
       this.loadPreviews();
     }

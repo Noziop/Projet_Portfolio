@@ -467,17 +467,14 @@ class TargetService:
             
         # Si aucun preset n'est spécifié, en choisir un (premier disponible ou défaut)
         if preset_id is None:
-            # Récupérer les presets disponibles pour cette cible
             target_presets = await self.target_preset_repository.get_by_target(target_id)
             if target_presets:
                 preset_id = target_presets[0].preset_id
             else:
-                # Utiliser un preset par défaut (RGB ou le premier disponible)
                 from app.infrastructure.repositories.models import Preset
                 from sqlalchemy import select
                 
                 async with self.session.begin():
-                    # Essayer de trouver preset RGB
                     stmt = select(Preset).where(Preset.preset_type == "RGB")
                     result = await self.session.execute(stmt)
                     rgb_preset = result.scalars().first()
@@ -485,7 +482,6 @@ class TargetService:
                     if rgb_preset:
                         preset_id = rgb_preset.id
                     else:
-                        # Prendre le premier preset disponible
                         stmt = select(Preset)
                         result = await self.session.execute(stmt)
                         first_preset = result.scalars().first()
@@ -504,37 +500,48 @@ class TargetService:
             "all_files_available": files_info["exists"]
         }
         
-        # S'il y a des JPG disponibles, les utiliser
+        # S'il y a des JPG disponibles, générer des URLs présignées
         if files_info["jpg_files"]:
             for jpg_path in files_info["jpg_files"]:
-                # Extraire le nom du filtre du chemin
-                filter_name = jpg_path.split("/")[-1].replace(".jpg", "")
-                result["preview_urls"][filter_name] = jpg_path
+                try:
+                    # Extraire le nom du filtre du chemin
+                    filter_name = jpg_path.split("/")[-1].replace(".jpg", "")
+                    
+                    # Générer l'URL présignée en spécifiant le bucket "fits-files"
+                    preview_data = self.storage_service.get_preview(jpg_path, bucket_name="fits-files")
+                    if preview_data:
+                        presigned_url = preview_data.get("url")
+                        if presigned_url:
+                            result["preview_urls"][filter_name] = presigned_url
+                except Exception as e:
+                    logger.exception(f"Erreur lors de la génération de l'URL présignée: {str(e)}")
             return result
-            
+                
         # S'il y a des FITS disponibles, générer des prévisualisations
         if files_info["fits_files"]:
             for fits_path in files_info["fits_files"]:
                 try:
-                    # Générer la prévisualisation
                     fits_data = await self.storage_service.get_fits_file(fits_path)
                     if fits_data:
-                        # Extraire le nom du filtre du chemin
                         filter_name = fits_path.split("/")[-1].replace(".fits", "")
                         preview_path = f"previews/{target.id}/{filter_name}.png"
                         
-                        # Stocker la prévisualisation
                         if await self.storage_service.store_preview(fits_data["data"], preview_path):
-                            result["preview_urls"][filter_name] = preview_path
+                            preview_data = self.storage_service.get_preview(preview_path)
+                            presigned_url = None
+                            if preview_data:
+                                presigned_url = preview_data.get("url")
+                            
+                            if presigned_url:
+                                result["preview_urls"][filter_name] = presigned_url
                 except Exception as e:
                     logger.exception(f"Erreur lors de la génération de la prévisualisation: {str(e)}")
             
-            # Si au moins une prévisualisation a été générée, renvoyer le résultat
             if result["preview_urls"]:
                 return result
         
-        # Aucune prévisualisation disponible
-        return None
+        return None  # Aucune prévisualisation disponible
+
 
     def add_file_from_mast_sync(
         self,

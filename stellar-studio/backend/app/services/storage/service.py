@@ -410,32 +410,41 @@ class StorageService:
                 storage_operations.labels(operation='retrieve', status='failed').inc()
                 return None
             
-    def get_preview(self, object_name: str) -> Optional[Dict[str, Any]]:
+    def get_preview(self, object_name: str, bucket_name: str = "fits-files") -> Optional[Dict[str, Any]]:
         """Récupère une preview depuis MinIO"""
         with storage_operation_duration.labels(operation='retrieve_preview').time():
             try:
-                stat = self.client.stat_object(self.preview_bucket, object_name)
-                obj = self.client.get_object(self.preview_bucket, object_name)
+                # Utiliser le bucket spécifié explicitement
+                stat = self.client.stat_object(bucket_name, object_name)
+                obj = self.client.get_object(bucket_name, object_name)
                 
                 # Lecture des données
                 preview_data = obj.read()
+                
+                # Génération de l'URL présignée avec gestion d'erreurs
+                try:
+                    presigned_url = self.client.presigned_get_object(
+                        bucket_name,
+                        object_name,
+                        expires=timedelta(hours=1)
+                    )
+                except Exception as e:
+                    logging.error(f"Error generating presigned URL for {object_name}: {str(e)}")
+                    presigned_url = None
                 
                 storage_operations.labels(operation='retrieve_preview', status='success').inc()
                 return {
                     "data": preview_data,
                     "size": stat.size,
                     "content_type": stat.content_type,
-                    # On peut ajouter une URL présignée pour le frontend
-                    "url": self.client.presigned_get_object(
-                        self.preview_bucket,
-                        object_name,
-                        expires=timedelta(hours=1)
-                    )
+                    "url": presigned_url
                 }
             except Exception as e:
-                logging.error(f"Error retrieving preview {object_name}: {str(e)}")
+                logging.error(f"Error retrieving preview {object_name} from {bucket_name}: {str(e)}")
                 storage_operations.labels(operation='retrieve_preview', status='failed').inc()
-                return None
+            return None
+
+
 
     def delete_fits_file(self, object_name: str) -> bool:
         """Supprime un fichier FITS de MinIO"""

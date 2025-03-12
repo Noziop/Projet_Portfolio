@@ -11,7 +11,13 @@ export default defineConfig({
         target: 'https://api.stellarstudio.fassih.ch',
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path  // Ne pas modifier le chemin
+        rewrite: (path) => path,  // Ne pas modifier le chemin
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            console.error('Erreur proxy:', err);
+          });
+        }
+      
       }
     }
   }

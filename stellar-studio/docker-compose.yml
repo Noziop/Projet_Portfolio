@@ -43,6 +43,7 @@ services:
       - "traefik.http.routers.prometheus.entrypoints=web"
       - "traefik.http.middlewares.auth-prometheus.basicAuth.users=${PROMETHEUS_USERNAME}:${PROMETHEUS_PASSWORD_HASH}"
       - "traefik.http.routers.prometheus.middlewares=auth-prometheus"
+      - "traefik.http.routers.grafana-to-prometheus.middlewares=no-auth"
     depends_on:
       - backend
     env_file:

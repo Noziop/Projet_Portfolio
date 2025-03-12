@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 import time
 import logging
 import hashlib
+from datetime import timedelta
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
@@ -336,60 +337,48 @@ async def get_target_presets(
 async def get_target_preview(
     target_id: UUID,
     response: Response,
-    if_none_match: Optional[str] = None,
-    preset_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Récupère les URLs de prévisualisation pour une cible avec support de cache Redis.
-    Si preset_id est fourni, les prévisualisations seront générées spécifiquement pour ce preset.
+    Endpoint tout-en-un qui génère des URLs présignées pour les previews.
     """
-    start_time = time.time()
+    # Récupération des fichiers depuis MinIO
+    storage_service = StorageService()
     
-    # Clé de cache incluant le preset_id si fourni
-    cache_key = f"target_preview_{target_id}_{preset_id or 'default'}"
-    
-    # Vérifier le cache Redis
-    cache_entry = RedisCache.get("target_preview", cache_key)
-    
-    # ETag et cache validation
-    if cache_entry and cache_entry.get("etag") and cache_entry.get("etag") == if_none_match:
-        logger.info(f"Redis cache hit with ETag for preview of target {target_id}")
-        return Response(status_code=HTTP_304_NOT_MODIFIED)
-    
-    if cache_entry:
-        logger.info(f"Redis cache hit for preview of target {target_id}")
-        response.headers["ETag"] = cache_entry.get("etag")
-        return cache_entry.get("data")
-    
-    # Requête à la DB si pas en cache
-    target_service = TargetService(
-        session=db,
-        storage_service=StorageService(),
-        ws_manager=ConnectionManager()
-    )
-    
-    preview_result = await target_service.generate_target_preview(target_id, preset_id)
-    if not preview_result or not preview_result.get("preview_urls"):
-        raise HTTPException(status_code=404, detail="Pas de prévisualisation disponible pour cette cible")
-    
-    # Formatage du résultat
-    result = {
-        "preview_urls": preview_result.get("preview_urls", {}),
-        "all_files_available": preview_result.get("all_files_available", False),
-        "missing_filters": preview_result.get("missing_filters", [])
-    }
-    
-    # Mise en cache Redis - plus long car les prévisualisations changent rarement
-    RedisCache.set("target_preview", cache_key, result, ttl=CACHE_TTL_LONG)
-    
-    # Générer un ETag
-    etag = md5(json.dumps(result).encode()).hexdigest()
-    cache_entry = RedisCache.get("target_preview", cache_key)
-    if cache_entry:
-        cache_entry["etag"] = etag
-        RedisCache.set("target_preview", cache_key, cache_entry, ttl=CACHE_TTL_LONG)
-    
-    response.headers["ETag"] = etag
-    logger.info(f"Preview for target {target_id} fetched in {time.time() - start_time:.3f}s")
-    return result
+    # Vérification des fichiers existants directement dans le bucket fits-files
+    try:
+        objects = storage_service.client.list_objects(
+            "fits-files", 
+            prefix=f"{target_id}/",
+            recursive=True
+        )
+        
+        # Filtrer pour ne garder que les JPG
+        jpg_files = [obj.object_name for obj in objects if obj.object_name.endswith('.jpg')]
+        
+        # Générer les URLs présignées directement
+        presigned_urls = {}
+        for jpg_path in jpg_files:
+            try:
+                filter_name = jpg_path.split('/')[-1].replace('.jpg', '')
+                # Génération directe de l'URL présignée
+                presigned_url = storage_service.client.presigned_get_object(
+                    "fits-files",
+                    jpg_path,
+                    expires=timedelta(hours=1)
+                )
+                presigned_urls[filter_name] = presigned_url
+            except Exception as e:
+                logger.error(f"Erreur URL présignée pour {jpg_path}: {str(e)}")
+        
+        # Construire et retourner le résultat
+        result = {
+            "preview_urls": presigned_urls,
+            "all_files_available": len(presigned_urls) > 0,
+            "missing_filters": []
+        }
+        
+        return result
+    except Exception as e:
+        logger.exception(f"Erreur globale endpoint preview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")

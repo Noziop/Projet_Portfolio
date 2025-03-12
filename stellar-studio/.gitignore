@@ -63,3 +63,6 @@ backend/tmp/*
 *@eaDir*
 backend/z_export/
 z_export/
+*.zip
+*.txt
+frontend/.vite/

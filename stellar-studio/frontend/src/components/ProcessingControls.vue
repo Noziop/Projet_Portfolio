@@ -3,17 +3,18 @@
       <v-card-title>Processing Controls</v-card-title>
       <v-card-text>
         <!-- Workflow Selection -->
-        <v-select
-          v-model="selectedWorkflow"
-          :items="workflows"
-          label="Processing Workflow"
-          item-title="name"
-          item-value="id"
-          prepend-icon="mdi-cog-outline"
+        <v-select 
+          v-model="selectedFilter"
+          :items="localFilters"
+          :preview-urls="previewUrls"
+          item-title="title"
+          item-value="value"
+          label="Filtre d'affichage"
+          prepend-icon="mdi-filter-outline"
         ></v-select>
   
         <!-- Processing Parameters -->
-        <v-expansion-panels>
+        <v-expansion-panels :disabled="!processingEnabled">
           <!-- Basic Adjustments -->
           <v-expansion-panel>
             <v-expansion-panel-title>Basic Adjustments</v-expansion-panel-title>
@@ -101,7 +102,7 @@
             color="error"
             variant="outlined"
             @click="resetParams"
-            :disabled="isProcessing"
+            :disabled="!processingEnabled || isProcessing"
           >
             Reset
           </v-btn>
@@ -109,7 +110,7 @@
             color="primary"
             @click="processImage"
             :loading="isProcessing"
-            :disabled="!canProcess"
+            :disabled="!processingEnabled || !canProcess"
           >
             Process Image
           </v-btn>
@@ -121,10 +122,28 @@
   <script>
   export default {
     name: 'ProcessingControls',
+    props: {
+      targetId: String,
+      presetId: String,
+      previewUrls: {
+        type: Object,
+        default: () => ({}),
+      },
+      availableFilters: {
+        type: Array,
+        default: () => []
+      },
+      processingEnabled: {
+        type: Boolean,
+        default: false
+      }
+    },
     data() {
       return {
         selectedWorkflow: null,
         isProcessing: false,
+        selectedFilter: null,
+        localFilters: [], 
         workflows: [
           { id: 'basic', name: 'Basic Processing' },
           { id: 'hdr', name: 'HDR Processing' },
@@ -145,12 +164,60 @@
         }
       }
     },
+    created() {
+      // Initialise avec les props
+      this.localFilters = this.availableFilters;
+    },
+    mounted() {
+      console.log("[ProcessingControls] mounted, localFilters =", this.localFilters);
+      console.log("[ProcessingControls] monté avec targetId =", this.targetId);
+      if (this.targetId) {
+        this.loadFilterOptions();
+      }
+    },
+    updated() {
+      console.log("[ProcessingControls] updated, localFilters =", this.localFilters);
+    },
     computed: {
       canProcess() {
         return this.selectedWorkflow && !this.isProcessing
       }
     },
     methods: {
+      async loadFilterOptions() {
+        if (!this.targetId) {
+          console.warn("Impossible de charger les filtres : targetId manquant");
+          return;
+        }
+        
+        try {
+          console.log("Chargement des filtres pour", this.targetId);
+          const response = await fetch(`/api/v1/targets/${this.targetId}/preview`);
+          const data = await response.json();
+          
+          if (data && data.preview_urls) {
+            // Transformer les URLs en options pour le v-select
+            const options = Object.entries(data.preview_urls).map(([key, url]) => ({
+              title: key,
+              value: key,
+              url: url
+            }));
+            this.localFilters = options;
+            console.log("Filtres chargés :", this.localFilters);
+          }
+        } catch (error) {
+          console.error("Erreur lors du chargement des filtres :", error);
+        }
+      },
+      updateFilters(filters) {
+        console.log('Mise à jour des filtres:', filters);
+        this.localFilters = filters;
+
+        if (filters && filters.length > 0) {
+          this.selectedFilter = filters[0].value;
+          this.$emit('filter-selected', this.selectedFilter);
+        }
+      },
       async processImage() {
         this.isProcessing = true
         try {
@@ -174,6 +241,41 @@
           denoise: 0,
           denoiseMethod: 'Gaussian'
         }
+      },
+      selectFilter() {
+        this.$emit('filter-selected', this.selectedFilter);
+      },
+    },
+    watch: {
+      targetId(newId) {
+        if (newId) {
+          this.loadFilterOptions();
+        }
+      },
+      availableFilters: {
+        handler(newFilters) {
+          console.log('[ProcessingControls] availableFilters changé:', newFilters);
+          // Vérification du format des données
+          if (newFilters && newFilters.length > 0) {
+            console.log('Premier élément:', newFilters[0]);
+            // S'assurer que chaque objet a title et value
+            this.localFilters = newFilters.map(filter => {
+              if (typeof filter === 'object' && filter.title && filter.value) {
+                return filter;
+              } else if (typeof filter === 'object' && filter.value) {
+                return { ...filter, title: filter.value };
+              } else {
+                return { 
+                  title: String(filter),
+                  value: filter
+                };
+              }
+            });
+          } else {
+            this.localFilters = [];
+          }
+        },
+        immediate: true
       }
     }
   }
