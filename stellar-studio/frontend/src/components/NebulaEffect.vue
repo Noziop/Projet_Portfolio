@@ -17,7 +17,7 @@
       const noise2D = createNoise2D()
   
       const createNebulaTexture = () => {
-  const size = 512
+  const size = 512  
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -43,8 +43,8 @@
       
       for (let o = 0; o < 4; o++) {
         noiseValue += amplitude * (noise2D(x * frequency / 100, y * frequency / 100) + 1) / 2
-        amplitude *= 0.5
-        frequency *= 2
+        amplitude *= 0.5 
+        frequency *= 3.8
       }
       
       // Adoucissement des bords avec une fonction de lissage
@@ -90,7 +90,7 @@
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            opacity: 0.6, // Augmenté de 0.2 à 0.4
+            opacity: 0.6,
             side: THREE.DoubleSide
           })
   

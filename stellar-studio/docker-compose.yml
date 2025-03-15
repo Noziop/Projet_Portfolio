@@ -39,7 +39,7 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.stellarstudio.app`)"
       - "traefik.http.routers.prometheus.entrypoints=web"
       - "traefik.http.middlewares.auth-prometheus.basicAuth.users=${PROMETHEUS_USERNAME}:${PROMETHEUS_PASSWORD_HASH}"
       - "traefik.http.routers.prometheus.middlewares=auth-prometheus"
@@ -63,7 +63,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.stellarstudio.app`)"
       - "traefik.http.routers.grafana.entrypoints=web"
     depends_on:
       - prometheus
@@ -80,7 +80,7 @@ services:
         BUILDKIT_INLINE_CACHE: 1
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`api.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.backend.rule=Host(`api.stellarstudio.app`)"
       - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
     volumes:
@@ -262,12 +262,15 @@ services:
       - minio-data:/data
     labels:
       - "traefik.enable=true"
-      # API S3
-      - "traefik.http.routers.minio-api.rule=Host(`minio.stellarstudio.fassih.ch`) && PathPrefix(`/api`)"
+      # Middleware pour retirer le préfixe /api avant d'envoyer à MinIO
+      - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
+      # API S3 - Avec le middleware pour retirer le préfixe
+      - "traefik.http.routers.minio-api.rule=Host(`minio.stellarstudio.app`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.minio-api.middlewares=strip-api"
       - "traefik.http.routers.minio-api.service=minio-api-service"
       - "traefik.http.services.minio-api-service.loadbalancer.server.port=9000"
       # Console MinIO
-      - "traefik.http.routers.minio-console.rule=Host(`minio.stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.stellarstudio.app`)"
       - "traefik.http.routers.minio-console.service=minio-console-service"
       - "traefik.http.services.minio-console-service.loadbalancer.server.port=9001"
     healthcheck:
@@ -288,7 +291,7 @@ services:
         BUILDKIT_INLINE_CACHE: 1
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`stellarstudio.fassih.ch`)"
+      - "traefik.http.routers.frontend.rule=Host(`www.stellarstudio.app`)"
       - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=8080"
     volumes:

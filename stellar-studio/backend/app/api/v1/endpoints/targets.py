@@ -335,50 +335,58 @@ async def get_target_presets(
 
 @router.get("/{target_id}/preview")
 async def get_target_preview(
-    target_id: UUID,
-    response: Response,
-    db: AsyncSession = Depends(get_db)
+    target_id: UUID
 ):
-    """
-    Endpoint tout-en-un qui génère des URLs présignées pour les previews.
-    """
-    # Récupération des fichiers depuis MinIO
+    """Endpoint qui retourne les noms des fichiers de preview disponibles"""
     storage_service = StorageService()
     
-    # Vérification des fichiers existants directement dans le bucket fits-files
     try:
+        # Liste des fichiers JPG disponibles
         objects = storage_service.client.list_objects(
             "fits-files", 
             prefix=f"{target_id}/",
             recursive=True
         )
         
-        # Filtrer pour ne garder que les JPG
         jpg_files = [obj.object_name for obj in objects if obj.object_name.endswith('.jpg')]
         
-        # Générer les URLs présignées directement
-        presigned_urls = {}
+        # Au lieu des URLs présignées, on retourne des URLs relatives à notre API
+        preview_urls = {}
         for jpg_path in jpg_files:
-            try:
-                filter_name = jpg_path.split('/')[-1].replace('.jpg', '')
-                # Génération directe de l'URL présignée
-                presigned_url = storage_service.client.presigned_get_object(
-                    "fits-files",
-                    jpg_path,
-                    expires=timedelta(hours=1)
-                )
-                presigned_urls[filter_name] = presigned_url
-            except Exception as e:
-                logger.error(f"Erreur URL présignée pour {jpg_path}: {str(e)}")
+            filter_name = jpg_path.split('/')[-1].replace('.jpg', '')
+            # URL relative vers notre nouvel endpoint
+            preview_urls[filter_name] = f"/api/v1/targets/{target_id}/images/{filter_name}"
         
-        # Construire et retourner le résultat
-        result = {
-            "preview_urls": presigned_urls,
-            "all_files_available": len(presigned_urls) > 0,
+        return {
+            "preview_urls": preview_urls,
+            "all_files_available": len(preview_urls) > 0,
             "missing_filters": []
         }
-        
-        return result
     except Exception as e:
-        logger.exception(f"Erreur globale endpoint preview: {str(e)}")
+        logger.exception(f"Erreur endpoint preview: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+
+@router.get("/{target_id}/images/{filter_name}")
+async def get_target_image(
+    target_id: UUID,
+    filter_name: str
+):
+    """Endpoint qui sert directement les images"""
+    storage_service = StorageService()
+    
+    try:
+        # Construire le chemin du fichier
+        image_path = f"{target_id}/{filter_name}.jpg"
+        
+        # Récupérer l'image directement depuis MinIO
+        data = storage_service.client.get_object("fits-files", image_path)
+        
+        # Retourner l'image avec les bons en-têtes
+        return Response(
+            content=data.read(),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "max-age=3600"}
+        )
+    except Exception as e:
+        logger.exception(f"Erreur récupération image: {str(e)}")
+        raise HTTPException(status_code=404, detail="Image non trouvée")

@@ -51,6 +51,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import apiClient from '../services/api'
 import websocketService, { createWebSocket } from '../services/websocket'
+import previewService from '../services/previewService';
 
 export default {
   name: 'ObjectSelector',
@@ -227,7 +228,9 @@ export default {
       downloadLoading.value = true
       downloadStatus.value = 'downloading'
       
-      try {
+      try {    
+        // Sauvegarder immédiatement le target_id (généralement c'est le catalogId)
+        previewService.setCurrentTargetId(selectedTarget.value);
         // Trouver le target sélectionné pour avoir son nom pour les logs
         const target = availableTargets.value.find(t => t.id === selectedTarget.value)
         

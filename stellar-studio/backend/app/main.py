@@ -188,11 +188,12 @@ async def listen_to_redis():
         # Reconnexion en cas d'erreur
         await asyncio.sleep(5)
         asyncio.create_task(listen_to_redis())  # Redémarrer l'écouteur
+        
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Ferme les connexions à la base de données"""
     logger.info("Fermeture des connexions à la base de données...")
-    from app.db.session import engine
-    await engine.dispose()
+    from app.db.session import async_engine
+    await async_engine.dispose()
     logger.info("Connexions fermées avec succès !")

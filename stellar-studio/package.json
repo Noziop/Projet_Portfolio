@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "v-viewer": "^3.0.21",
+    "viewerjs": "^1.11.7"
+  }
+}

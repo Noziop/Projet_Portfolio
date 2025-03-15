@@ -1,5 +1,6 @@
 <template>
   <default-layout>
+    <NebulaEffect />
     <v-container fluid>
       <v-row>
         <!-- Panneau de gauche : Sélection et contrôles -->
@@ -47,7 +48,7 @@
                 ref="imageViewer"
                 :targetId="currentTargetId"
                 :selectedFilter="selectedFilter"
-                @previews-loaded="handlePreviewsLoaded"
+                :previewUrls="previewUrls"
                 :image-url="currentImage"
                 @update:parameters="handleParameterUpdate"
               />
@@ -125,11 +126,15 @@ import ProcessingControls from '../components/ProcessingControls.vue'
 import ImageViewer from '../components/ImageViewer.vue'
 import websocketService, { createWebSocket } from '../services/websocket'
 import axios from 'axios'
+import NebulaEffect from '../components/NebulaEffect.vue'
+import previewService from '../services/previewService';
+
 
 export default {
   name: 'Processing',
   components: {
     DefaultLayout,
+    NebulaEffect,
     ObjectSelector,
     ProcessingControls,
     ImageViewer
@@ -162,15 +167,10 @@ export default {
     console.log('Processing: WebSocket est désactivé, utilisation du polling à la place');
 
     console.log("Initial filteredAvailableFilters:", this.filteredAvailableFilters);
-    console.log("Initial localFilters:", this.localFilters);
     
     // Pour activer le WebSocket plus tard, utiliser:
     // this.enableWebSocket = true;
     // this.initWebSocket();
-  },
-  async mounted() {
-    const { data } = await axios.get(`/api/v1/targets/${this.targetId}/preview`);
-    this.previewUrls = data.preview_urls;
   },
   methods: {
     initWebSocket() {
@@ -194,6 +194,9 @@ export default {
           console.error('Processing: Erreur lors du nettoyage WebSocket:', error);
         }
       }
+      
+      // Arrêter le polling au démontage
+      this.stopPolling();
     },
 
     // Pour filtrer les filtres selon preset (HOO, RGB, etc.)
@@ -227,53 +230,60 @@ export default {
       }
     },
     
-    // Gérer la réception des prévisualisations
+    // Cette méthode est simplifiée pour éviter les duplications
     handlePreviewsLoaded(data) {
-      console.log('Prévisualisations chargées:', data);
+      console.log('✨ Notification de prévisualisations chargées');
+      // On ne traite rien ici pour éviter la duplication avec loadFilterOptions
+    },
+    // Méthode centralisée pour charger les options de filtre
+    async loadFilterOptions(targetId) {
+      const result = await previewService.loadPreviews(targetId);
       
-      if (data && data.preview_urls) {
-        // Transforme l'objet preview_urls en un tableau d'objets {title, value, url}
-        const filtersArray = Object.entries(data.preview_urls).map(([key, url]) => ({
-          title: this.getFilterDisplayName(key),  // Le nom affiché dans la dropdown
-          value: key,                             // La valeur utilisée pour identifier le filtre
-          url: url                                // L'URL présignée pour afficher l'image
-        }));
-        
-        this.availableFilters = filtersArray;
-        this.filteredAvailableFilters = filtersArray;
-        
-        // Sélectionne automatiquement le premier filtre
-        if (filtersArray.length > 0 && !this.selectedFilter) {
-          this.handleFilterSelected(filtersArray[0].value);
-        }
-        
-        console.log("Filtres disponibles:", this.filteredAvailableFilters);
-        
-        // Met à jour le composant ProcessingControls
-        if (this.$refs.processingControls) {
-          console.log("Reference ProcessingControls trouvée, mise à jour des filtres");
-          this.$refs.processingControls.updateFilters(this.filteredAvailableFilters);
-        } else {
-          console.warn("Reference ProcessingControls non trouvée!");
-          // Ajouter un délai pour laisser le temps au composant d'être monté
-          setTimeout(() => {
-            if (this.$refs.processingControls) {
-              this.$refs.processingControls.updateFilters(this.filteredAvailableFilters);
-            }
-          }, 500);
-        }
+      if (!result) {
+        console.warn('⚠️ Pas de previews disponibles');
+        return;
+      }
+      
+      // Mettre à jour l'état local
+      this.previewUrls = result.previewUrls;
+      this.filteredAvailableFilters = result.filters;
+      this.availableFilters = result.filters;
+      
+      // Mettre à jour ProcessingControls
+      if (this.$refs.processingControls) {
+        this.$refs.processingControls.updateFilters(result.filters);
+      }
+      
+      // Sélectionner le premier filtre par défaut
+      if (result.filters.length > 0 && !this.selectedFilter) {
+        this.handleFilterSelected(result.filters[0].value);
       }
     },
-    
-    // Gérer la sélection d'un filtre
+
+    // Simplifier ta méthode handleFilterSelected
     handleFilterSelected(filter) {
-      console.log('Filtre sélectionné:', filter);
+      console.log('🔍 Filtre sélectionné:', filter);
       this.selectedFilter = filter;
       
-      // Trouve l'URL correspondant au filtre sélectionné
-      const selectedFilterObj = this.filteredAvailableFilters.find(f => f.value === filter);
-      if (selectedFilterObj) {
-        this.currentImage = selectedFilterObj.url;
+      if (this.previewUrls && this.previewUrls[filter]) {
+        // Transformer l'URL avant de la passer à l'enfant
+        const originalUrl = this.previewUrls[filter];
+        
+        // Transformation pour utiliser l'API MinIO via Traefik
+        if (originalUrl.includes('minio:9000')) {
+          const urlParts = originalUrl.split('minio:9000/');
+          if (urlParts.length > 1) {
+            // Garder le chemin et la requête intacts
+            const pathAndQuery = urlParts[1];
+            this.currentImage = `https://minio.stellarstudio.app/api/${pathAndQuery}`;
+          } else {
+            this.currentImage = originalUrl;
+          }
+        } else {
+          this.currentImage = originalUrl;
+        }
+        
+        console.log('🖼️ Image transformée:', this.currentImage);
       }
     },
     
@@ -289,7 +299,6 @@ export default {
       
       return presetMap[presetId] || 'RGB';
     },
-    
     handleWebSocketMessage(data) {
       try {
         console.log('Message WebSocket reçu dans Processing:', data);
@@ -380,7 +389,6 @@ export default {
         color: 'info'
       }
     },
-
     handleDownloadComplete(result) {
       this.downloadCompleted = true;
       const filesCount = result.files ? result.files.length : 0;
@@ -407,47 +415,6 @@ export default {
         text: 'Prêt pour le traitement',
         color: 'success'
       };
-    },
-
-    handleFilterSelected(filter) {
-      console.log('Filtre sélectionné:', filter);
-      this.selectedFilter = filter;
-      const selectedFilterObj = this.filteredAvailableFilters.find(f => f.value === filter);
-      if (selectedFilterObj) {
-        this.currentImage = selectedFilterObj.url;
-      }
-    },
-
-    async loadFilterOptions(targetId) {
-      if (!targetId) return;
-      console.log("✨ Chargement direct des prévisualisations pour:", targetId);
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`/api/v1/targets/${targetId}/preview`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        console.log("🌌 Données brutes reçues:", response.data);
-
-        if (response.data && response.data.preview_urls) {
-          const filtersArray = Object.entries(response.data.preview_urls).map(([key, url]) => ({
-            title: key,
-            value: key,
-            url: url
-          }));
-          this.availableFilters = filtersArray;
-          this.filteredAvailableFilters = filtersArray;
-
-          if (this.$refs.processingControls) {
-            this.$refs.processingControls.updateFilters(filtersArray);
-          }
-
-          if (filtersArray.length > 0) {
-            this.currentImage = filtersArray[0].url;
-          }
-        }
-      } catch (error) {
-        console.error("Erreur chargement des prévisualisations:", error);
-      }
     },
 
     handleDownloadProgress(data) {
@@ -528,23 +495,64 @@ export default {
       if (!this.activeTaskId) return;
       
       try {
-        // Récupérer le token d'authentification depuis le localStorage
+        // Récupérer le token d'authentification
         const token = localStorage.getItem('token');
         
-        // Ajouter le header d'authentification
+        // Appel API avec authentification
         const { data } = await axios.get(`/api/v1/tasks/${this.activeTaskId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
-        console.log('Polling task status:', data);
+        console.log('Statut de la tâche:', data);
         
         if (data.status === 'COMPLETED') {
           this.downloadCompleted = true;
-          console.log('appel api pour charger les filtres');
-          this.loadFilterOptions(data.target_id);
+          
+          // Récupérer le target_id de la tâche ou utiliser celui qu'on a déjà
+          const targetId = data.target_id || this.currentTargetId || localStorage.getItem('stellarStudio_currentTargetId');
+          
+          if (targetId) {
+            // MAJ du targetId courant si nécessaire
+            if (!this.currentTargetId) {
+              this.currentTargetId = targetId;
+            }
+            
+            // Si on a un ID, on peut charger les filtres
+            console.log('Chargement des filtres pour target:', targetId);
+            try {
+              const response = await axios.get(`/api/v1/targets/${targetId}/preview`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              if (response.data && response.data.preview_urls) {
+                this.previewUrls = response.data.preview_urls;
+                
+                const filtersArray = Object.entries(response.data.preview_urls).map(([key, url]) => ({
+                  title: key,
+                  value: key,
+                  url: url
+                }));
+                
+                this.availableFilters = filtersArray;
+                this.filteredAvailableFilters = filtersArray;
+                
+                if (this.$refs.processingControls) {
+                  this.$refs.processingControls.updateFilters(filtersArray);
+                }
+                
+                if (filtersArray.length > 0 && !this.selectedFilter) {
+                  this.selectedFilter = filtersArray[0].value;
+                  this.currentImage = filtersArray[0].url;
+                }
+              }
+            } catch (previewError) {
+              console.error('Erreur chargement previews:', previewError);
+            }
+          }
 
+          // Mise à jour du statut et historique
           this.processingStatus = {
             text: 'Téléchargement terminé',
             color: 'success'
@@ -559,17 +567,14 @@ export default {
             }
           }
           
-          // Restaurer l'ajout à l'historique avec le nombre correct de fichiers
           this.addUniqueHistoryItem({
             description: `Téléchargement terminé : ${nbFichiers} fichiers disponibles`,
             timestamp: new Date().toLocaleTimeString(),
             status: 'success',
-            files: [] // On n'a pas les chemins des fichiers individuels ici
+            files: [] 
           });
           
           this.showNotification(`Téléchargement terminé : ${nbFichiers} fichiers disponibles`, 'success');
-          
-          // Arrêter le polling si la tâche est terminée
           this.stopPolling();
         } else if (data.status === 'FAILED') {
           this.processingStatus = {
@@ -584,13 +589,10 @@ export default {
           });
           
           this.showNotification(data.error || 'Erreur lors du téléchargement', 'error');
-          
-          // Arrêter le polling en cas d'erreur
           this.stopPolling();
         }
-        // Les autres états (PENDING, RUNNING) sont déjà gérés
       } catch (error) {
-        console.error('Erreur lors de la vérification du statut de la tâche:', error);
+        console.error('Erreur vérification statut:', error);
       }
     },
 

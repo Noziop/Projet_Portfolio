@@ -136,7 +136,7 @@ async def seed_telescopes(session: AsyncSession):
         focal_length="57.6m",
         location="Low Earth Orbit",
         status=TelescopeStatus.ONLINE,
-        api_endpoint="https://api.stellastudio.fassih.ch/api/v1/telescopes/{telescope_id}",
+        api_endpoint="https://api.stellarstudio.app/api/v1/telescopes/{telescope_id}",
         instruments=[
         {"name": "WFC3", "type": "Camera (200-1700nm)"},
         {"name": "ACS", "type": "Camera (350-1100nm)"},
@@ -155,7 +155,7 @@ async def seed_telescopes(session: AsyncSession):
         focal_length="131.4m",
         location="L2 Orbit",
         status=TelescopeStatus.ONLINE,
-        api_endpoint="https://api.stellastudio.fassih.ch/api/v1/telescopes/{telescope_id}",
+        api_endpoint="https://api.stellarstudio.app/api/v1/telescopes/{telescope_id}",
         instruments=[
         {"name": "NIRCam", "type": "Near Infrared Camera"},
         {"name": "MIRI", "type": "Mid-Infrared Instrument"},

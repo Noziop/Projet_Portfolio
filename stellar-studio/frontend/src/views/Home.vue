@@ -1,6 +1,6 @@
 <template>
   <default-layout>
-    <animated-stars :star-count="2000" />
+    <animated-stars :star-count="300" />
     <nebula-effect />
     <lightspeed-transition ref="lightspeedTransition" />
     <v-container class="content-overlay">

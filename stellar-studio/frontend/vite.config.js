@@ -6,9 +6,10 @@ export default defineConfig({
   server: {
     port: 8080,
     host: true,
+    allowedHosts: ["www.stellarstudio.app"],
     proxy: {
       '/api/v1': {
-        target: 'https://api.stellarstudio.fassih.ch',
+        target: 'https://api.stellarstudio.app',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path,  // Ne pas modifier le chemin
@@ -17,7 +18,11 @@ export default defineConfig({
             console.error('Erreur proxy:', err);
           });
         }
-      
+      },
+      '/minio': {
+        target: 'http://minio:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio/, '')
       }
     }
   }
