@@ -164,6 +164,7 @@ By March 13th, we will provide:
    - User acceptance validation
 
 5. **Production Environment:**
-   - Deployed application with HTTPS
+   - Deployed application with HTTPS (https://www.stellarstudio.app)
    - Monitoring dashboard
    - Backup and recovery procedures
+
