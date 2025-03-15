@@ -50,10 +50,6 @@ async def root():
         "version": "1.0.0"
     }
 
-@app.get("/test-route")
-async def test_route():
-    return {"status": "ok"}
-
 
 @app.on_event("startup")
 async def startup_event():

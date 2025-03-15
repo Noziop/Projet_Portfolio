@@ -17,7 +17,7 @@ scrape_configs:
       - targets: ['redis-exporter:9121']
 
   - job_name: minio-job
-    bearer_token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwcm9tZXRoZXVzIiwic3ViIjoibWluaW9hZG1pbiIsImV4cCI6NDg5MjYzMzc0OH0.FTO3O8p_O38YCzDHl2idqFzh1Tzep_Kjc60qBk5oIUvOTHGNX8Ef0jPO7XUXDV3Oi4IXTetYFMroKMllC1psmQ
+    bearer_token: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwcm9tZXRoZXVzIiwic3ViIjoibWluaW9hZG1pbiIsImV4cCI6NDg5NTYzNDA2Mn0.R3RTkT6ZUOJfC6D3MKs2nNZkm0YAYrC_ROdc3CEAqbBJXio_HDrwyVFJnkGn2os74iImu4_2gwNHYWWJ-3Untw
     metrics_path: /minio/v2/metrics/cluster
     scheme: http
     static_configs:
