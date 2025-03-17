@@ -13,9 +13,9 @@
 
 ### Comparison to Initial Objectives
 - Achieved 95% of planned features in the Project Charter
-- Successfully implemented the priority features for DemoDay: processing presets (HOO, SHO, HaRVB)
+- Successfully implemented the priority features for DemoDay: processing presets (HOO, RVB)
 - Completed the frontend UI with intuitive controls for beginners
-- Implemented the demo scenario: Upload → Processing → Visualization
+- Implemented the demo scenario: Target Choice → Downloading → Visualization
 
 ## Lessons Learned
 
@@ -23,10 +23,10 @@
 - Docker containers ensured consistent deployment
 - The DDD/Clean Architecture created maintainable code
 - MinIO provided efficient storage for large astronomical images
-- FastAPI and Celery created a robust backend processing system
+- FastAPI and Celery created a robust backend processing system without blocking the Ui for better UX
 
 ### Challenges Faced
-- CORS configuration between frontend and MinIO required significant troubleshooting
+- CORS configuration between frontend and MinIO required significant troubleshooting => had to find another way
 - Authentication token management between components needed careful implementation
 - Preprocessing of astronomical images required specialized knowledge
 
@@ -34,6 +34,7 @@
 - Allocate more time for testing cross-component integration
 - Create more comprehensive API documentation earlier in the project
 - Develop a more robust error handling strategy for image processing failures
+- Design a documentation on the fly alongside the project.
 
 ## Presentation Structure (10 minutes)
 
@@ -45,6 +46,7 @@
 - The need for user-friendly astronomical image processing tools
 - Technical stack selection and architecture design
 - Development of backend services, frontend components and data flow
+- Domain acquisition: stellarstudio.app
 
 ### Demonstration (5 minutes)
 - User journey:
@@ -57,12 +59,11 @@
 ### Conclusion (2 minutes)
 - Key achievements and challenges overcome
 - Vision for StellarStudio's evolution
-- Domain acquisition: stellarstudio.app
 - Next development steps
 
 ## Deliverables
 
 - [Complete architecture and implementation documentation](architecture.md)
-- API usage guide : once you've installed the project, navite to [Api_Documentation](http://api.localhost/docs)
+- API usage guide : once you've installed the project, navigate to [Api_Documentation](http://api.stellarstudio.app/docs)
 - [Deployment instructions](Deployment_instructions.md)
 - 10-minute presentation with live demonstration of core features (https://prezi.com/view/zuxY4uYGGrcR9Zx3eXqL/)
