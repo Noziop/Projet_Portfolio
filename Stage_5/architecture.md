@@ -1,15 +1,15 @@
 # StellarStudio System Architecture
 
 ## System Overview
-![System Architecture](../assets/diagrams/system-overview.png)
+![System Architecture](./assets/diagrams/system-overview.png)
 
 ## Component Interactions
-![Component Flow](../assets/diagrams/component-flow.png)
+![Component Flow](./assets/diagrams/component-flow.png)
 
 ## Key Workflows
 
 ### Authentication Flow
-![Authentication Sequence](../assets/diagrams/auth-sequence.png)
+![Authentication Sequence](./assets/diagrams/auth-sequence.png)
 
 Key authentication features:
 - JWT-based authentication
@@ -18,7 +18,7 @@ Key authentication features:
 - Role-based access control
 
 ### Data Processing Flow
-![Data Processing Sequence](../assets/diagrams/data-flow-sequence.png)
+![Data Processing Sequence](./assets/diagrams/data-flow-sequence.png)
 
 MVP processing features:
 - NASA/MAST catalog integration
