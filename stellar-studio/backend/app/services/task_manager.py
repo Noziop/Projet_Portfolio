@@ -1,7 +1,8 @@
 # services/task_manager.py
-from app.domain.models.task import Task
+from app.infrastructure.repositories.models.task import Task # Changed to SQLAlchemy model
 from app.core.celery import celery_app
 from app.db.session import SessionLocal
+from datetime import datetime, timezone # Added import
 
 class TaskManager:
     @staticmethod
@@ -14,7 +15,8 @@ class TaskManager:
             user_id=user_id,
             type=task_type,
             status="PENDING",
-            parameters=parameters
+            parameters=parameters,
+            created_at=datetime.now(timezone.utc) # Added created_at
         )
         db.add(task)
         db.commit()

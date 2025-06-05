@@ -8,7 +8,7 @@ from app.domain.models.user import User, UserRole
 from app.schemas.telescope import TelescopeCreate, TelescopeUpdate, TelescopeResponse
 from app.services.telescopes import telescope_service
 
-router = APIRouter(prefix="/api/v1/admin/telescopes", tags=["telescope-management"])
+router = APIRouter(tags=["telescope-management"]) # Removed prefix
 
 @router.post("/", response_model=TelescopeResponse)
 @require_role(UserRole.ADMIN)
